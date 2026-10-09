@@ -1,0 +1,18 @@
+[submodule "upstream/tencentdb-agent-memory"]
+	path = tencentdb-agent-memory
+	url = https://github.com/ShiftHackZ/ellmsha-TencentDB-Agent-Memory.git
+[submodule "upstream/aionui"]
+	path = aionui
+	url = https://github.com/ShiftHackZ/ellmsha-AionUi.git
+[submodule "bmad-method"]
+	path = bmad-method
+	url = https://github.com/ShiftHackZ/ellmsha-BMAD-METHOD.git
+[submodule "ponytail"]
+	path = ponytail
+	url = https://github.com/ShiftHackZ/ellmsha-ponytail.git
+[submodule "aioncore"]
+	path = aioncore
+	url = https://github.com/ShiftHackZ/ellmsha-AionCore.git
+[submodule "aionrs"]
+	path = aionrs
+	url = https://github.com/iOfficeAI/aionrs.git

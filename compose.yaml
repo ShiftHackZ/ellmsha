@@ -1,0 +1,32 @@
+services:
+  aionui:
+    build:
+      context: .
+      dockerfile: docker/aionui.Dockerfile
+      args:
+        TDAI_PANEL_URL: http://127.0.0.1:${PANEL_PORT:-8125}/
+    image: ellmsha-v3/aionui:local
+    ports:
+      - "127.0.0.1:${AIONUI_PORT:-3000}:3000"
+    environment:
+      AIONUI_PORT: "3000"
+      AIONUI_ALLOW_REMOTE: "true"
+      AIONUI_DATA_DIR: /data
+      AIONUI_OPEN_BROWSER: "0"
+      AIONUI_TDAI_MEMORY_CONFIG: /run/ellmsha/aionui-memory.json
+      AIONUI_GENERATION_CALLBACK_ORIGIN: http://aionui:3000
+    volumes:
+      - ./.data/aionui:/data
+      - ${V3_WORKSPACES_DIR:-./workspaces}:/workspaces
+      - ${KNOWLEDGE_LOCAL_SOURCE_ROOT:-./workspaces}:${KNOWLEDGE_LOCAL_MOUNT_ROOT:-/workspaces/ellmsha-v3}:ro
+      - ./.data/tencentdb/aionui-memory.docker.json:/run/ellmsha/aionui-memory.json:ro
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    networks:
+      - memory
+    restart: unless-stopped
+
+networks:
+  memory:
+    name: tdai-memory-stack
+    external: true

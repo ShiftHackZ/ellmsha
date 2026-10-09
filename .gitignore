@@ -1,0 +1,11 @@
+.env
+.data/
+workspaces/
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+
+# Local dependencies and runtime-generated skill links
+node_modules/
+.codex/
