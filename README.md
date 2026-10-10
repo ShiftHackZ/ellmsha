@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/cheremsha-pet.png" alt="Cheremsha, the eLLMsha desktop pet" width="240" height="260" />
+
 # eLLMsha
 
 **e**xtensible **L**arge **L**anguage **M**odel **s**mart **h**arness **a**rchitecture
