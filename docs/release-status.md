@@ -1,6 +1,6 @@
 # Release readiness — 2026-10-10
 
-This is an evidence ledger for the current local candidate, not a public release announcement.
+This is an evidence ledger. Release notes: [v2026.10.10 Patch 3](releases/2026.10.10-patch.3.md).
 
 The refreshed macOS candidate includes the Clockify report repairs and Computer Use permission setup and button corrections, alongside the earlier WebUI and durable-upload repairs. Its DMG and ZIP build completed on 2026-10-10; package checksums and the copied installer app’s ad-hoc signature were verified. With the debug app stopped, the app copied from that DMG launched on the normal eLLMsha Desktop profile: existing projects/chats appeared, the latest chat message ID matched, and an existing durable memory note was read successfully. Earlier isolated installed migration, restart and theme checks remain bounded evidence as recorded below.
 
@@ -50,3 +50,11 @@ Build commands, artifact names and Flatpak test procedure are in the [desktop re
 - Fixed preparer assumptions about local upstream remotes, tags, submodule `.git` files and the committed Computer Use fork revision. The installed harness ran 22 focused tests and an independent read-only review with no findings.
 - Cloned the public root recursively with credential helpers disabled; all nine pinned revisions checked out and the new worktree was clean. Mobile MCP, Chrome DevTools MCP and Computer Use `--verify-only` checks passed in that clone. No local source alternates or dependency-directory copies were used.
 - Source publication does not create a GitHub binary Release or change the existing local macOS installation.
+
+## Patch 3 — 2026-10-10
+
+- Managed Codex CLI 0.162.1 and live catalog discovery verified; actual GPT-6 Astra inference and Tencent memory read passed in the installed app.
+- Managed/System/Custom runtime sources and resolved paths/versions checked in native UI. Independent update check returned the same version; no predecessor was available for a live cross-version rollback. Rollback/session pinning have focused test and independent review coverage.
+- Fresh/resumed skill and memory discovery passed; harness skills no longer pollute user project repositories. Auto network access and Read Only network access passed; an exclusive write outside the workspace was denied and the probe remained absent.
+- Runtime buttons and labels were inspected in Light and Dark. Real profile was preserved across production replacements.
+- Release date policy: the date portion of the version matches the publication date in Europe/Kiev. Branding and package metadata are synchronized at 2026.10.10 Patch 3. Historical tags are immutable.
