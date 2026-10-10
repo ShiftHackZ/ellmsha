@@ -18,7 +18,7 @@ The refreshed macOS candidate includes the Clockify report repairs and Computer 
 | Clockify | One user-connected account passed identity/workspace/project reads. Repaired report date formatting and empty-terminal-page handling; rebuilt live bounded report returned complete zero, one covered interval, no missing intervals or truncation. Focused tests and independent review passed | Populated report parsing, individual entry read-back and live multi-account isolation remain unverified; a second account is not required for this milestone |
 | Computer Use | Both macOS permissions confirmed for the bundled runtime. Installed plugin discovered Calculator, captured its accessibility tree/screenshot, clicked observed controls and read back 73; evaluator independently confirmed the native result. Plugin permission check showed both Granted; shared rounded action visually checked in Light and Dark | Broader application coverage and missing-permission onboarding on a fresh host; slow/error visual states covered by focused tests rather than forced native failures |
 | Diagnostic themes | Technical Details contrast visually checked in Light, Dark and eLLMsha; rebuilt WebUI applies Dark, eLLMsha, Follow System and Light with success feedback and retains each selection through actual browser reload; 16 lifecycle/ordering tests and bounded review passed | Fresh DMG native Appearance switched Dark/eLLMsha/Follow System/Light with success feedback and renderer reload checks; actual host OS appearance changes and full-process theme restart were not exercised |
-| Source distribution | User authorized publication of all maintained fork revisions and the root repository on 2026-10-10; integration branches and root gitlinks publish the selected sources | Fresh-checkout verification below; cross-platform clean builds remain bounded by the platform checks above |
+| Source distribution | Published root and all nine maintained fork revisions on 2026-10-10; anonymous recursive clone obtained every exact gitlink and passed all three source provenance verifiers | Full builds on a fresh host and cross-platform packaging remain separate from the verified source checkout |
 | VPS containers | Current WebUI/core/hub images built on Linux arm64 Docker; four-service isolated stack started; unauthenticated requests rejected; real form login, Plugins load, toggle persistence and logout passed; machine-wide plugin mutations rejected; authenticated WebSocket event delivery and CUA-visible missed-message/runtime recovery without reload passed for a deterministic pre-provider error; a stopped-writer backup restored into new volumes with exact memory and WebUI identity read-back; actual bootstrap script created stable identities and generated working packaged MCP configuration in fresh isolated containers, surviving recreation | Unmodified launcher on a clean VPS, live model streaming/embedding requests and cross-version restore |
 
 ## Checks that need the maintainer
@@ -29,7 +29,7 @@ The earlier implementation audit was followed by live Clockify report defects an
 | --- | --- | --- |
 | Claude | User has no subscription; live QA is skipped for this milestone | Fresh/resumed/child inference remains unverified; no login action is required now |
 | Native interactions | Notification click/dismiss observation; pet window targeting or human observation | Check notification navigation/closure and pet animation, drag and menu; the visible notification banner was already confirmed by the user |
-| Source publication | Authorized on 2026-10-10; maintained fork revisions, including AionRS, are being published | Fresh recursive checkout verification; full builds on clean hosts remain separate checks |
+| Source publication | Completed on 2026-10-10; root main and all nine maintained integration branches, including AionRS, are public | Anonymous recursive checkout and Mobile/Chrome/Computer Use provenance checks passed; full clean-host builds remain separate checks |
 
 Credentials and OS consent cannot be inferred from successful unit tests. Broader destructive device operations, external issue/time-entry writes and large-corpus performance tests were not part of the bounded acceptance and are not silently added as release requirements.
 
@@ -37,8 +37,16 @@ Credentials and OS consent cannot be inferred from successful unit tests. Broade
 
 - Complete applicable macOS and integration gates above. Per user decision on 2026-10-10, Windows/Linux need only package-build verification, and even those builds may be skipped for this milestone; VM installation/runtime QA is deferred. Do not report skipped checks as passed.
 - Root license selected by the user on 2026-10-10: AGPL-3.0-only with a separate paid commercial option for rights controlled by Moroz Inc. LICENSE contains the official unmodified text; LICENSING.md describes scope and third-party/contributor boundaries. DMG/ZIP refreshed after license selection; root AGPL/commercial guidance and nine component license texts are bundled. Installed from the refreshed DMG to /Applications/eLLMsha.app and launched on the real profile with existing chats and memory verified. Source publication was authorized on 2026-10-10. Binary release publication is separate from the source push; provide corresponding-source access with binary distributions.
-- Make required fork revisions reachable, then verify a fresh recursive checkout on a clean host.
+- All required fork revisions are reachable. An isolated anonymous recursive checkout passed on 2026-10-10, without local upstream remotes or preinstalled dependencies; this is not a full fresh-host build.
 - See the bounded [source and license inventory](component-licenses.md). Review tracked/untracked release inputs for private data and secrets. Never publish `.env`, `.data`, local profiles, credentials or commercial workspace contents.
 - Build final artifacts, verify checksums and signatures, then obtain authorization for any new binary release publication. The current source push is explicitly authorized.
 
 Build commands, artifact names and Flatpak test procedure are in the [desktop release guide](../scripts/release/README.md).
+
+## Source publication verification — 2026-10-10
+
+- Root implementation commit: `eccf1ad`; all nine forks published on `feature/ellmsha-v2026.10.9-patch1`, with exact revisions recorded by the root gitlinks.
+- Local commit author for publication: Dmitriy Moroz `<dmitriy@moroz.cc>`.
+- Fixed preparer assumptions about local upstream remotes, tags, submodule `.git` files and the committed Computer Use fork revision. The installed harness ran 22 focused tests and an independent read-only review with no findings.
+- Cloned the public root recursively with credential helpers disabled; all nine pinned revisions checked out and the new worktree was clean. Mobile MCP, Chrome DevTools MCP and Computer Use `--verify-only` checks passed in that clone. No local source alternates or dependency-directory copies were used.
+- Source publication does not create a GitHub binary Release or change the existing local macOS installation.
