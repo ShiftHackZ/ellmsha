@@ -1,0 +1,79 @@
+name: Desktop packages (manual, unsigned)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: macos-arm64
+          - os: windows-2022
+            target: windows-x64
+          - os: ubuntu-24.04
+            target: linux-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - name: Preserve fork source bytes for provenance checks
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.9'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.12'
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Native Linux and Flatpak prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libssl-dev flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive flathub org.freedesktop.Platform//26.08 org.freedesktop.Sdk//26.08 org.electronjs.Electron2.BaseApp//26.08
+      - name: Install locked desktop dependencies
+        working-directory: aionui
+        run: bun install --frozen-lockfile
+      - name: Build native packages from checked-out forks
+        # Exercise the real npm launcher on each host before the lengthy build.
+        # Linux/macOS do not prove the Windows .cmd path works.
+        run: |
+          node --test scripts/run-build-command.test.js scripts/release/flatpak-preflight.test.mjs
+          node -e "require('./scripts/run-build-command').runBuildCommand('npm', ['--version'], {stdio:'inherit'})"
+      - name: Package native desktop
+        run: node scripts/release/build.mjs
+      - name: Require every installer format and generate checksums
+        run: node scripts/release/verify-artifacts.mjs
+      - name: Collect packages (no release publication)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ellmsha-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            aionui/out/*.dmg
+            aionui/out/*.zip
+            aionui/out/*.exe
+            aionui/out/*.flatpak
+            aionui/out/*.deb
+            aionui/out/SHA256SUMS-*.txt

@@ -15,4 +15,13 @@
 	url = https://github.com/ShiftHackZ/ellmsha-AionCore.git
 [submodule "aionrs"]
 	path = aionrs
-	url = https://github.com/iOfficeAI/aionrs.git
+	url = https://github.com/ShiftHackZ/ellmsha-aionrs.git
+[submodule "mobile-mcp"]
+	path = mobile-mcp
+	url = https://github.com/ShiftHackZ/ellmsha-mobile-mcp.git
+[submodule "chrome-devtools-mcp"]
+	path = chrome-devtools-mcp
+	url = https://github.com/ShiftHackZ/ellmsha-chrome-devtools-mcp.git
+[submodule "open-codex-computer-use"]
+	path = open-codex-computer-use
+	url = https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use.git

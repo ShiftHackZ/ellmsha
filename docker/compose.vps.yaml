@@ -1,0 +1,108 @@
+# Overlay for the root compose.yaml after scripts/v3.sh up has provisioned
+# identities/configuration and scripts/v3.sh down has stopped the bootstrap stack.
+# Paths resolve relative to the FIRST Compose file (the repository root).
+services:
+  aionui:
+    depends_on:
+      memory-core:
+        condition: service_healthy
+      memory-hub:
+        condition: service_healthy
+
+  memory-core:
+    image: ${MEMORY_CORE_IMAGE:-ellmsha-memory-core:local}
+    restart: unless-stopped
+    networks: [memory]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    ports: ["127.0.0.1:${MEMORY_CORE_PORT:-8420}:8420"]
+    environment:
+      AION_LLM_REQUIRE_CONTEXT: "1"
+      AION_LLM_CALLBACK_ALLOWED_HOSTS: aionui
+      TDAI_GATEWAY_PORT: "8420"
+      TDAI_GATEWAY_HOST: 0.0.0.0
+      TDAI_GATEWAY_API_KEY: ${MEMORY_CORE_GATEWAY_API_KEY:-local}
+      TDAI_DATA_DIR: /data/tdai-memory
+      STORE_MODE: sqlite
+    volumes:
+      - memory-core-data:/data/tdai-memory
+      - type: bind
+        source: ./.data/tencentdb/core-config/tdai-gateway.yaml
+        target: /data/config/tdai-gateway.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, curl, -fsS, "http://127.0.0.1:8420/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+
+  memory-hub:
+    image: ${MEMORY_HUB_IMAGE:-ellmsha-memory-hub:local}
+    restart: unless-stopped
+    networks: [memory]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      memory-core:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PANEL_PORT:-8125}:8125"
+      - "127.0.0.1:${KNOWLEDGE_PORT:-8424}:8424"
+    environment:
+      AION_LLM_REQUIRE_CONTEXT: "1"
+      AION_LLM_CALLBACK_ALLOWED_HOSTS: aionui
+      PANEL_PORT: "8125"
+      KNOWLEDGE_PORT: "8424"
+      KNOWLEDGE_PUBLIC_BASE_URL: ${KNOWLEDGE_PUBLIC_BASE_URL:-http://127.0.0.1:8424/v3}
+      KNOWLEDGE_SERVICE_KEY: ${KNOWLEDGE_SERVICE_KEY:?Run the bootstrap launcher first}
+      KNOWLEDGE_AUTH_TOKEN: ${KNOWLEDGE_SERVICE_KEY:?Run the bootstrap launcher first}
+      REMOTE_INSTANCE_ID: default
+      REMOTE_INSTANCE_NAME: default
+      REMOTE_INSTANCE_URL: http://memory-core:8420
+      REMOTE_INSTANCE_KEY: ${MEMORY_CORE_GATEWAY_API_KEY:-local}
+      REMOTE_INSTANCE_PROXY_URL: ${MEMORY_HUB_PROXY_PUBLIC_URL:-http://127.0.0.1:8096}
+      LLM_MODE: custom
+      LLM_PROTOCOL: ${MEMORY_LLM_PROTOCOL:-openai}
+      LLM_API_KEY: ${MEMORY_LLM_API_KEY:-}
+      LLM_BASE_URL: ${MEMORY_LLM_BASE_URL:-}
+      LLM_MODEL: ${MEMORY_LLM_MODEL:-}
+      KNOWLEDGE_LLM_BINDING_SYNC: "0"
+    volumes:
+      - memory-panel-data:/data/knowledge
+      - ${KNOWLEDGE_LOCAL_SOURCE_ROOT:-./workspaces}:${KNOWLEDGE_LOCAL_MOUNT_ROOT:-/workspaces/ellmsha-v3}:ro
+    healthcheck:
+      test: [CMD-SHELL, "curl -fsS http://127.0.0.1:8125/health >/dev/null && curl -fsS http://127.0.0.1:8424/health >/dev/null"]
+      interval: 10s
+      timeout: 8s
+      retries: 18
+      start_period: 45s
+
+  proxy:
+    image: ${PROXY_IMAGE:-agentmemory/memory-proxy:latest}
+    restart: unless-stopped
+    networks: [memory]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      memory-core:
+        condition: service_healthy
+      memory-hub:
+        condition: service_healthy
+    ports: ["127.0.0.1:${PROXY_PORT:-8096}:8096"]
+    volumes:
+      - type: bind
+        source: ./.data/tencentdb/proxy-config/config.yaml
+        target: /data/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+
+# Bootstrap creates these exact volumes. Requiring them prevents accidentally
+# starting against empty replacement volumes when deployment configuration is lost.
+volumes:
+  memory-core-data:
+    external: true
+    name: ${MEMORY_CORE_VOLUME:-ellmsha-v3-memory-core}
+  memory-panel-data:
+    external: true
+    name: ${PANEL_VOLUME:-ellmsha-v3-memory-panel}

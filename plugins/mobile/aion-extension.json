@@ -1,0 +1,45 @@
+{
+  "name": "mobile",
+  "version": "1.0.8",
+  "displayName": "Mobile Next",
+  "description": "Mobile automation for Android and iOS devices, emulators, and simulators.",
+  "author": "Mobile Next",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/mobile-next/mobile-mcp",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "network": true,
+    "shell": true,
+    "filesystem": "full",
+    "active_user": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "mobile-automation",
+        "description": "Discover and control a selected Android or iOS device with Mobile Next MCP.",
+        "path": "skills/mobile-automation/SKILL.md"
+      }
+    ],
+    "mcpServers": [
+      {
+        "id": "mobile-mcp",
+        "name": "Mobile Next MCP",
+        "description": "Pinned Mobile Next device discovery and automation server.",
+        "auto_approve_in_unattended": true,
+        "transport": {
+          "type": "stdio",
+          "command": "node",
+          "args": [
+            "-e",
+            "const entry=process.env.ELLM_SHA_MOBILE_MCP_ENTRY;if(!entry){console.error('Mobile MCP runtime is missing. Rebuild eLLMsha from its pinned mobile-mcp checkout.');process.exit(1)}require(entry)"
+          ],
+          "env": {
+            "ELLM_SHA_MOBILE_MCP_ENTRY": "${ELLM_SHA_MOBILE_MCP_ENTRY}",
+            "MOBILEMCP_DISABLE_TELEMETRY": "1"
+          }
+        }
+      }
+    ]
+  }
+}

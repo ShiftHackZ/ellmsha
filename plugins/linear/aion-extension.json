@@ -1,0 +1,29 @@
+{
+  "name": "linear",
+  "version": "1.0.1",
+  "displayName": "Linear",
+  "description": "Independent Linear OAuth identities for issues, projects, comments, and attachments.",
+  "author": "eLLMsha",
+  "license": "MIT",
+  "homepage": "https://linear.app/docs/mcp",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "storage": true,
+    "network": {
+      "allowedDomains": ["mcp.linear.app", "linear.app", "api.linear.app", "uploads.linear.app"],
+      "reasoning": "Authenticate with Linear and use the official hosted Linear MCP server."
+    },
+    "shell": true,
+    "filesystem": "extension-only",
+    "active_user": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "linear-project-work",
+        "description": "Use independently authenticated Linear accounts and clarify ambiguous account intent.",
+        "path": "skills/linear-project-work/SKILL.md"
+      }
+    ]
+  }
+}

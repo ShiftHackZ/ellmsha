@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .data/
 workspaces/
 *.log
@@ -9,3 +11,8 @@ __pycache__/
 # Local dependencies and runtime-generated skill links
 node_modules/
 .codex/
+.claude/
+.pnpm-store/
+
+# Local IDE workspace metadata
+.idea/

@@ -3,6 +3,7 @@
 
 import json
 import os
+import stat
 import sys
 import urllib.error
 import urllib.request
@@ -18,6 +19,49 @@ BASE = "http://127.0.0.1:8420/v3/meta"
 USERNAME = "ellmsha_v3"
 TEAM_NAME = "eLLMsha v3"
 AGENT_NAME = "General"
+
+
+def read_private_text(path: Path) -> str:
+    """Read a regular file only after restricting its descriptor to this user."""
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise RuntimeError(f"Private credential path is not a regular file: {path}")
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "r") as source:
+            fd = -1
+            value = source.read().strip()
+    finally:
+        if fd >= 0:
+            os.close(fd)
+    if not value:
+        raise RuntimeError(f"Private credential file is empty: {path}")
+    return value
+
+
+def write_private_text(path: Path, value: str, *, exclusive: bool = False) -> None:
+    """Write private data through a descriptor that is mode 0600 before any bytes."""
+    flags = os.O_WRONLY | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    flags |= os.O_EXCL if exclusive else os.O_TRUNC
+    fd = os.open(path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as output:
+            fd = -1
+            output.write(value)
+            output.flush()
+            os.fsync(output.fileno())
+    except Exception:
+        if exclusive:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+        raise
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 def request(route: str, key: str | None, body: dict) -> dict:
@@ -51,11 +95,11 @@ def identity(key: str) -> dict:
 def main() -> None:
     if not ADMIN_KEY.is_file():
         raise RuntimeError("Start the memory stack first: scripts/v3.sh up")
-    admin_key = ADMIN_KEY.read_text().strip()
+    admin_key = read_private_text(ADMIN_KEY)
     identity(admin_key)
 
     if BUSINESS_KEY.is_file():
-        business_key = BUSINESS_KEY.read_text().strip()
+        business_key = read_private_text(BUSINESS_KEY)
         user = identity(business_key)
     else:
         users = request("user/list", admin_key, {"username": USERNAME})
@@ -63,8 +107,7 @@ def main() -> None:
             raise RuntimeError("Pilot user exists but business-key is missing; recover or create a new user in the panel")
         created = request("user/create", admin_key, {"username": USERNAME})
         business_key = created["default_user_key"]
-        BUSINESS_KEY.write_text(business_key)
-        os.chmod(BUSINESS_KEY, 0o600)
+        write_private_text(BUSINESS_KEY, business_key, exclusive=True)
         user = identity(business_key)
 
     user_id = user["user_id"]
@@ -112,16 +155,13 @@ def main() -> None:
         (DOCKER_CONFIG, "http://memory-core:8420", "http://memory-hub:8424", mount_root),
     ]
     for config_path, gateway, knowledge_url, host_path in targets:
-        fd = os.open(config_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as output:
-            json.dump({
-                **app_config,
-                "gatewayUrl": gateway,
-                "knowledgeUrl": knowledge_url,
-                "knowledgeWorkspaces": [{"hostPath": host_path, "servicePath": mount_root}] if source_root else [],
-            }, output)
-            output.write("\n")
-        os.chmod(config_path, 0o600)
+        config = {
+            **app_config,
+            "gatewayUrl": gateway,
+            "knowledgeUrl": knowledge_url,
+            "knowledgeWorkspaces": [{"hostPath": host_path, "servicePath": mount_root}] if source_root else [],
+        }
+        write_private_text(config_path, json.dumps(config) + "\n")
 
     print(f"Memory pilot ready: team={team_id}, agent={agent['agent_id']}")
     print(f"Business key stored locally at {BUSINESS_KEY}; do not commit it.")

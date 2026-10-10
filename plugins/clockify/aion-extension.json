@@ -1,0 +1,36 @@
+{
+  "name": "clockify",
+  "version": "1.0.0",
+  "displayName": "Clockify",
+  "description": "Independent Clockify API-key identities for bounded reports and approval-gated time entry changes.",
+  "author": "eLLMsha",
+  "license": "MIT",
+  "homepage": "https://docs.clockify.me/",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "storage": true,
+    "network": {
+      "allowedDomains": [
+        "api.clockify.me",
+        "reports.api.clockify.me",
+        "euc1.clockify.me",
+        "use2.clockify.me",
+        "euw2.clockify.me",
+        "apse2.clockify.me"
+      ],
+      "reasoning": "Verify Clockify API keys and read or mutate Clockify data through the selected account."
+    },
+    "shell": false,
+    "filesystem": "extension-only",
+    "active_user": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "clockify-time-tracking",
+        "description": "Use independent Clockify identities with explicit workspace/project selection and safe mutation approval.",
+        "path": "skills/clockify-time-tracking/SKILL.md"
+      }
+    ]
+  }
+}

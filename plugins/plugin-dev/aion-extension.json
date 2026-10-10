@@ -1,0 +1,20 @@
+{
+  "name": "plugin-dev",
+  "version": "1.0.0",
+  "displayName": "Plugin Authoring",
+  "description": "Create, validate, install, update, and remove eLLMsha, Agent Plugins, Codex, and Claude-compatible plugin packages.",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "filesystem": "workspace",
+    "shell": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "plugin-authoring",
+        "description": "Author and install plugins with skills and approval-gated MCP servers.",
+        "path": "skills/plugin-authoring/SKILL.md"
+      }
+    ]
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "computer-use",
+  "version": "0.3.6",
+  "displayName": "Open Computer Use",
+  "description": "Local desktop automation for macOS, Linux, and Windows through the pinned Open Computer Use fork.",
+  "author": "Leo",
+  "license": "MIT",
+  "homepage": "https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "network": false,
+    "shell": true,
+    "filesystem": "extension-only",
+    "active_user": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "open-computer-use",
+        "description": "Inspect and operate desktop applications with the local Open Computer Use MCP server.",
+        "path": "skills/open-computer-use/SKILL.md"
+      }
+    ],
+    "mcpServers": [
+      {
+        "id": "open-computer-use",
+        "name": "Open Computer Use",
+        "description": "Pinned local desktop automation server. macOS access requires user-granted Accessibility and Screen Recording permissions.",
+        "transport": {
+          "type": "stdio",
+          "command": "node",
+          "args": [
+            "-e",
+            "const{spawn}=require('node:child_process');const entry=process.env.ELLM_SHA_OPEN_COMPUTER_USE_ENTRY;if(!entry){console.error('Open Computer Use runtime is missing. Rebuild eLLMsha from its pinned fork checkout.');process.exit(1)}const child=spawn(entry,['mcp'],{stdio:'inherit',windowsHide:true});child.on('error',error=>{console.error(error.message);process.exit(1)});child.on('exit',code=>process.exit(code??1));for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{if(!child.killed)child.kill(signal)})"
+          ],
+          "env": {
+            "ELLM_SHA_OPEN_COMPUTER_USE_ENTRY": "${ELLM_SHA_OPEN_COMPUTER_USE_ENTRY}"
+          }
+        }
+      }
+    ]
+  }
+}

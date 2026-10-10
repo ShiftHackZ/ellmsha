@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "example-safe-plugin",
+  "version": "1.0.0",
+  "description": "Example portable plugin with one skill and one side-effect-free MCP tool.",
+  "author": {
+    "name": "Example Author"
+  },
+  "license": "MIT"
+}

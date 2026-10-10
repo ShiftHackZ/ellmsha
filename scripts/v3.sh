@@ -9,7 +9,7 @@ export MEMORY_CORE_CONFIG_DIR="$ROOT/.data/tencentdb/core-config"
 export PROXY_CONFIG_DIR="$ROOT/.data/tencentdb/proxy-config"
 
 usage() {
-  echo "Usage: scripts/v3.sh init|doctor|up|down|status|desktop-dev|desktop-build|desktop" >&2
+  echo "Usage: scripts/v3.sh init|doctor|computer-use-doctor|up|down|status|desktop-dev|desktop-build|desktop" >&2
   exit 2
 }
 
@@ -44,6 +44,18 @@ build_backend() {
   export AIONUI_BACKEND_LOCAL_BINARY="$AIONUI_BACKEND_BIN"
 }
 
+prepare_mobile_mcp() {
+  node "$ROOT/scripts/prepare-mobile-mcp.js" "$@"
+}
+
+prepare_chrome_devtools_mcp() {
+  node "$ROOT/scripts/prepare-chrome-devtools-mcp.js" "$@"
+}
+
+prepare_open_computer_use() {
+  node "$ROOT/scripts/prepare-open-computer-use.js" "$@"
+}
+
 case "${1:-}" in
   init)
     mkdir -p "$ROOT/.data/tencentdb" "$ROOT/workspaces"
@@ -61,8 +73,14 @@ case "${1:-}" in
     docker compose --env-file "$ENV_FILE" -f "$ROOT/compose.yaml" config --quiet
     echo "Local configuration is valid. Live LLM connectivity is checked by the upstream TencentDB verify script."
     ;;
+  computer-use-doctor)
+    prepare_open_computer_use --doctor
+    ;;
   up)
     "$0" doctor
+    prepare_mobile_mcp --verify-only
+    prepare_chrome_devtools_mcp --verify-only
+    prepare_open_computer_use --verify-only
     mkdir -p "$ROOT/.data/tencentdb" "$ROOT/workspaces"
     "$TDAI/verify.sh" --skip-llm
     "$TDAI/start-memory-core.sh"
@@ -82,6 +100,9 @@ case "${1:-}" in
   desktop-dev)
     [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || { echo "Desktop dev is configured for macOS arm64" >&2; exit 1; }
     node "$ROOT/aionui/scripts/memory/prepare.cjs"
+    prepare_mobile_mcp
+    prepare_chrome_devtools_mcp
+    prepare_open_computer_use
     build_backend dev
     core_dir="$ROOT/aionui/resources/bundled-aioncore/darwin-arm64"
     electron_dir="$ROOT/aionui/node_modules/electron"
@@ -129,6 +150,9 @@ case "${1:-}" in
   desktop-build)
     [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || { echo "The pinned desktop release is configured for macOS arm64" >&2; exit 1; }
     [[ -x "$ROOT/aionui/node_modules/.bin/electron-builder" ]] || { echo "Install AionUi dependencies before desktop-build" >&2; exit 1; }
+    prepare_mobile_mcp
+    prepare_chrome_devtools_mcp
+    prepare_open_computer_use
     build_backend release
     (cd "$ROOT/aionui" && node scripts/build-with-builder.js arm64 --mac --arm64 --skip-native)
     ;;
