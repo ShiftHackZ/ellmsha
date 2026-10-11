@@ -2,7 +2,7 @@
 
 ## Prepare the checkout
 
-Use the maintained fork revisions recorded by this checkout. The AionRS revision is currently a publication gate: do not replace it with upstream to get a clean clone building. See [release status](../../docs/release-status.md).
+Use the maintained fork revisions recorded by this checkout. Release commits pin published component revisions; do not replace them with upstream to get a clean clone building. See [release status](../../docs/release-status.md).
 
 Install the native toolchains described below. The current CI configuration pins Node.js 22.20.0, Bun 1.3.9, Python 3.12 and Go 1.22.12; AionCore selects Rust 1.95.0 through its `rust-toolchain.toml`. These are the configured build inputs, not a claim that every platform CI job has passed.
 
@@ -64,7 +64,7 @@ For each subsequent installer candidate, use an isolated profile, create a chat 
 
 ## Current release gates
 
-- The preserved AionRS baseline must be made reachable in its maintained fork before a fresh recursive checkout can build. Publishing it requires separate authorization.
+- Publish each changed maintained fork revision before publishing the root commit that pins it. Verify that every release gitlink is reachable from its public fork.
 - User decision (2026-10-10): Windows/Linux acceptance requires package creation only; both builds may be skipped for the current milestone because no test VMs are available. Installation/runtime, cross-version migration and external host-agent checks on those systems are deferred, not claimed as passed.
 - Tencent preparation uses checked-in npm locks in `aionui/scripts/memory/locks`, installed with the shipped Node ABI. Update those locks deliberately when dependency declarations change; a mismatched manifest fails `npm ci`.
 

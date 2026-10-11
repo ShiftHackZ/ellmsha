@@ -1,6 +1,19 @@
-# Release readiness — 2026-10-10
+# Release readiness — 2026-10-11
 
-This is an evidence ledger. Release notes: [v2026.10.10 Patch 3](releases/2026.10.10-patch.3.md).
+This is an evidence ledger. Current release notes: [v2026.10.11 Patch 5](releases/2026.10.11-patch.5.md). Earlier evidence is retained below.
+
+## Patch 5 — 2026-10-11
+
+- Scoped retrieval, project aliases, exact IDs, recency, source caveats and explicit completeness/degraded status have focused Rust, TypeScript and gateway contract coverage. Explicit context searches now use the same project binding as memory searches.
+- Installed acceptance exercised 17 gateway cases and enumerated 224 distinct sources across three pages without duplicates. These are bounded checks, not a claim that every possible question is covered.
+- Fresh GPT and Qwen chats recovered the main latest-task fact. Identical-source comparisons and native runs still exposed a Qwen factual-detail/caveat limitation; native timings were one run with different provider wrappers, not a hardware benchmark.
+- Scoped chat-history listing/read-back and cross-project rejection passed. Two standalone continuation cases have planner test coverage rather than independent native-turn proof.
+- Fourteen actual code graph MCP calls exercised allocation, query, release and reload; persistent index content remained unchanged. Current-architecture tool use is guided, not programmatically mandatory. A full memory reindex tool remains deferred until coordinated service restart and rollback are available.
+- The installed Patch 5 baseline retained the real profile and displayed synchronized component metadata. The final release refresh includes the subsequent explicit-search metadata and context-scope repairs; package and installed checks are recorded with the release artifacts.
+- Final required push gates passed: AionCore **8,397 tests passed, 26 skipped**; AionRS **2,248 passed, 2 skipped**; AionUI **3,354 passed, 5 skipped**. Lint, formatting, TypeScript, i18n, migration and dependency checks passed where prescribed by each component. Stale test fixtures were aligned with existing fork behavior; packaging tests now isolate their output from production artifacts. No new test skips were introduced.
+- Public release inputs exclude local acceptance logs, profiles and customer-specific fixtures. macOS signing remains ad-hoc; Claude inference, Windows/Linux builds and cross-version managed CLI rollback remain outside the verified scope.
+
+## Earlier installer and integration evidence
 
 The refreshed macOS candidate includes the Clockify report repairs and Computer Use permission setup and button corrections, alongside the earlier WebUI and durable-upload repairs. Its DMG and ZIP build completed on 2026-10-10; package checksums and the copied installer app’s ad-hoc signature were verified. With the debug app stopped, the app copied from that DMG launched on the normal eLLMsha Desktop profile: existing projects/chats appeared, the latest chat message ID matched, and an existing durable memory note was read successfully. Earlier isolated installed migration, restart and theme checks remain bounded evidence as recorded below.
 

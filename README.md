@@ -55,9 +55,9 @@ Installed macOS test profile after rebuilding its fixture with a 768-dimensional
 
 ## Start with the desktop
 
-The current candidate is **v2026.10.9 Patch 1**. Source is available in this repository. macOS packages are locally verified candidates; Developer ID signing and notarization are not yet provided.
+The latest release is **[v2026.10.11 Patch 5](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.11-patch.5)**, with scoped memory retrieval and on-demand code graph controls. macOS packages are ad-hoc signed; Developer ID signing and notarization are not yet provided.
 
-1. Build an installer on its native operating system using the [desktop build guide](scripts/release/README.md).
+1. [Download the Apple Silicon DMG](https://github.com/ShiftHackZ/ellmsha/releases/download/v2026.10.11-patch.5/eLLMsha-2026.10.11-patch.5-mac-arm64.dmg), or build from source using the [desktop build guide](scripts/release/README.md).
 2. Open a project folder, then attach any additional codebases from the Files panel.
 3. Choose an agent/model. For local inference, configure Ollama and install the models you need.
 4. Open **Settings → Memory** to configure the embedding model; open **Plugins** to connect integrations.
