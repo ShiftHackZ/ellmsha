@@ -1,17 +1,17 @@
-# Release readiness — 2026-10-12
+# Release readiness — 2026-10-13
 
-This is an evidence ledger for [v2026.10.12 Patch 7](releases/2026.10.12-patch.7.md). The preceding release is [v2026.10.11 Patch 5](releases/2026.10.11-patch.5.md). Earlier evidence is retained below.
+This is an evidence ledger for [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md). Publication status and downloadable artifacts are shown on [GitHub Releases](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.13-patch.7). The preceding release is [v2026.10.11 Patch 5](releases/2026.10.11-patch.5.md). Earlier evidence is retained below.
 
-## Patch 7 — 2026-10-12
+## Patch 7 — 2026-10-13
 
-[Patch 7 release notes](releases/2026.10.12-patch.7.md) combine the unpublished Patch 6 work with subsequent browser and native-agent repairs. **Installed macOS build: verified. Scoped assisted evaluation: PASS.**
+[Patch 7 release notes](releases/2026.10.13-patch.7.md) combine the unpublished Patch 6 work with subsequent browser and native-agent repairs. **2026-10-12 candidate: installed and verified; scoped assisted evaluation PASS. 2026-10-13 release-date rebuild: complete; package verification PASS.** The version date follows publication in Europe/Kiev. The installed app was not replaced and no repeated live evaluation of the new dated build is claimed. The earlier `v2026.10.12-patch.7` tag remains an unreleased source snapshot.
 
 - Browser actions verify the exact live target and native input frame, preserve same-URL tab identity, reject closed selections without fallback, and work while another application is active without forcing application focus.
 - Dynamic MCP guidance, paginated discovery and safe catalog refresh are included, alongside the source-backed conversation working brief, evidence categories and CodeGraph/source versus memory/history guidance.
 - Native empty-response recovery is bounded and retains tool/approval guards; disallowed finalization calls terminate visibly without execution. Additional changes cover automatic titles, Linear embedded-image normalization, empty native field values and explicit native evaluation scope.
 - Real-model checks and independent observations passed on disposable, noncommercial fixtures. Browser input/lifecycle and fresh helper-host access passed in the installed candidate; earlier task-context, CodeGraph and title results remain prior Patch 6 evidence. These were assisted scenarios, not proof of autonomous model reliability or universal regression freedom.
-- Component regression gates, focused browser/packaging checks, TypeScript, formatting, package verification and independent reviews passed. All earlier failed trials and detailed QA evidence are retained locally; they have not been relabelled as successful tests.
-- The prepared macOS Apple Silicon DMG and ZIP are ad-hoc signed, without Developer ID notarization. Windows/Linux builds and runtime checks were skipped. Live child/fork isolation, forced-compaction recovery, long-session guidance growth and future changed-helper permission persistence remain unverified.
+- Component regression gates, focused browser/packaging checks, TypeScript, formatting, package verification and independent reviews passed. Final source gates recorded AionCore **8,415 passed / 26 skipped** and AionUI **3,405 passed / 5 skipped**. All earlier failed trials and detailed QA evidence are retained locally; they have not been relabelled as successful tests.
+- The `2026.10.13-patch.7` macOS Apple Silicon DMG and ZIP were built. Version metadata, DMG integrity and deep, strict app-signature verification passed; [release notes](releases/2026.10.13-patch.7.md#source-and-binary-correspondence) record their sizes and SHA-256 hashes. The packaged backend and Computer Use helper are byte-identical to the installed evaluated candidate, and the helper's designated requirement is unchanged. Signing remains ad-hoc, without Developer ID signing or notarization. Windows/Linux builds and runtime checks were skipped. Live child/fork isolation, forced-compaction recovery, long-session guidance growth and future changed-helper permission persistence remain unverified.
 
 ## Unpublished candidate — 2026-10-12 Patch 6
 
