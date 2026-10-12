@@ -1,6 +1,21 @@
-# Release readiness — 2026-10-11
+# Release readiness — 2026-10-12
 
-This is an evidence ledger. Current release notes: [v2026.10.11 Patch 5](releases/2026.10.11-patch.5.md). Earlier evidence is retained below.
+This is an evidence ledger for [v2026.10.12 Patch 7](releases/2026.10.12-patch.7.md). The preceding release is [v2026.10.11 Patch 5](releases/2026.10.11-patch.5.md). Earlier evidence is retained below.
+
+## Patch 7 — 2026-10-12
+
+[Patch 7 release notes](releases/2026.10.12-patch.7.md) combine the unpublished Patch 6 work with subsequent browser and native-agent repairs. **Installed macOS build: verified. Scoped assisted evaluation: PASS.**
+
+- Browser actions verify the exact live target and native input frame, preserve same-URL tab identity, reject closed selections without fallback, and work while another application is active without forcing application focus.
+- Dynamic MCP guidance, paginated discovery and safe catalog refresh are included, alongside the source-backed conversation working brief, evidence categories and CodeGraph/source versus memory/history guidance.
+- Native empty-response recovery is bounded and retains tool/approval guards; disallowed finalization calls terminate visibly without execution. Additional changes cover automatic titles, Linear embedded-image normalization, empty native field values and explicit native evaluation scope.
+- Real-model checks and independent observations passed on disposable, noncommercial fixtures. Browser input/lifecycle and fresh helper-host access passed in the installed candidate; earlier task-context, CodeGraph and title results remain prior Patch 6 evidence. These were assisted scenarios, not proof of autonomous model reliability or universal regression freedom.
+- Component regression gates, focused browser/packaging checks, TypeScript, formatting, package verification and independent reviews passed. All earlier failed trials and detailed QA evidence are retained locally; they have not been relabelled as successful tests.
+- The prepared macOS Apple Silicon DMG and ZIP are ad-hoc signed, without Developer ID notarization. Windows/Linux builds and runtime checks were skipped. Live child/fork isolation, forced-compaction recovery, long-session guidance growth and future changed-helper permission persistence remain unverified.
+
+## Unpublished candidate — 2026-10-12 Patch 6
+
+[Candidate changes and verification](releases/2026.10.12-patch.6.md) cover browser target routing, dynamic tool guidance, task-local constraints/evidence, automatic title privacy and adapter contracts. The macOS arm64 DMG (803,507,918 bytes) and ZIP (837,357,977 bytes) passed package checks. Patch 6 was subsequently installed in `/Applications/eLLMsha.app`, preserving the real profile, and evaluated through retained synthetic QA chats. Task-context reconciliation and CodeGraph passed. Background browser input timed out; native guidance acceptance was blocked by account-plugin auto-attachment despite an empty selected MCP list. That candidate did **not complete full acceptance**; the cumulative Patch 7 disposition above records the subsequent scoped result. Local evidence: `.data/acceptance/patch6-live-2026-10-12/README.md`. Commercial projects were not test fixtures; no release was published.
 
 ## Patch 5 — 2026-10-11
 

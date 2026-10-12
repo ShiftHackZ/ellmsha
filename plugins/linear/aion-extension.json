@@ -1,6 +1,6 @@
 {
   "name": "linear",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "displayName": "Linear",
   "description": "Independent Linear OAuth identities for issues, projects, comments, and attachments.",
   "author": "eLLMsha",

@@ -7,7 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const OPEN_COMPUTER_USE_VERSION = '0.3.6';
-const OPEN_COMPUTER_USE_COMMIT = '3908413ac48bdfa1f98226bc2b84272bc13378ae';
+const OPEN_COMPUTER_USE_COMMIT = 'e142e8f39b3cbe9da8372cb2bf76370c5437c642';
+// Exact reviewed source bytes, including the committed eLLMsha patches.
+const OPEN_COMPUTER_USE_SOURCE_DIGEST = '516ea577c18650e3818de3cedf5c89900060edf71bc5efdd3ecf693f2379e035';
 const OPEN_COMPUTER_USE_UPSTREAM_COMMIT = '83a521e546102564efd002f61a6763912081e5c7';
 const OPEN_COMPUTER_USE_ORIGIN = 'https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use.git';
 const OPEN_COMPUTER_USE_UPSTREAM = 'https://github.com/iFurySt/open-codex-computer-use.git';
@@ -38,7 +40,7 @@ function hashBuildInputs(checkout) {
         continue;
       }
       const absolutePath = path.join(directory, entry.name);
-      const relativePath = path.join(relativeDirectory, entry.name);
+      const relativePath = path.posix.join(relativeDirectory, entry.name);
       hash.update(relativePath);
       if (entry.isDirectory()) {
         visit(absolutePath, relativePath);
@@ -79,7 +81,8 @@ function inspectOpenComputerUseCheckout(options = {}) {
   } catch {
     upstream = undefined;
   }
-  const checkoutChanges = runGit(['status', '--porcelain', '--untracked-files=all']);
+  const expectedSourceDigest = options.expectedSourceDigest ?? OPEN_COMPUTER_USE_SOURCE_DIGEST;
+  const sourceDigest = hashBuildInputs(checkout);
   const problems = [];
 
   if (manifest.version !== OPEN_COMPUTER_USE_VERSION) {
@@ -102,7 +105,9 @@ function inspectOpenComputerUseCheckout(options = {}) {
   if (!fs.existsSync(licensePath) || !fs.readFileSync(licensePath, 'utf8').startsWith('MIT License')) {
     problems.push('MIT LICENSE is missing or unexpected');
   }
-  if (checkoutChanges) problems.push(`checkout changes are present: ${checkoutChanges.replace(/\n/g, ', ')}`);
+  if (sourceDigest !== expectedSourceDigest) {
+    problems.push(`source digest ${sourceDigest}; expected ${expectedSourceDigest}`);
+  }
   if (problems.length > 0) {
     throw new Error(`Open Computer Use checkout does not match the eLLMsha pin:\n- ${problems.join('\n- ')}`);
   }
@@ -110,7 +115,7 @@ function inspectOpenComputerUseCheckout(options = {}) {
   return {
     checkout,
     commit,
-    sourceDigest: hashBuildInputs(checkout),
+    sourceDigest,
     upstreamCommit: OPEN_COMPUTER_USE_UPSTREAM_COMMIT,
     version: OPEN_COMPUTER_USE_VERSION,
   };
@@ -176,7 +181,8 @@ function verifyOpenComputerUseRuntime(options) {
       throw new Error(`Open Computer Use runtime marker ${name} is ${marker[name] ?? '<missing>'}; expected ${value}`);
     }
   }
-  if (options.sourceDigest && marker.sourceDigest !== options.sourceDigest) {
+  const expectedSourceDigest = options.sourceDigest ?? OPEN_COMPUTER_USE_SOURCE_DIGEST;
+  if (marker.sourceDigest !== expectedSourceDigest) {
     throw new Error('Open Computer Use runtime was built from stale checkout contents');
   }
   if (targetPlatform !== 'win32') {
@@ -367,6 +373,7 @@ if (require.main === module) {
 
 module.exports = {
   OPEN_COMPUTER_USE_COMMIT,
+  OPEN_COMPUTER_USE_SOURCE_DIGEST,
   OPEN_COMPUTER_USE_MARKER,
   OPEN_COMPUTER_USE_ORIGIN,
   OPEN_COMPUTER_USE_UPSTREAM,

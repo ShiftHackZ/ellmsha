@@ -6,12 +6,12 @@ COPY scripts/run-build-command.js /tmp/run-build-command.js
 COPY chrome-devtools-mcp/ ./
 ENV PUPPETEER_SKIP_DOWNLOAD=true NPM_CONFIG_CACHE=/tmp/npm-cache NODE_OPTIONS=--max-old-space-size=4096
 RUN node -e "const p=require('./package.json');const l=require('./package-lock.json');if(p.version!=='0.16.0'||l.packages[''].version!=='0.16.0')process.exit(1)" \
-    && node -e "const {hashBuildInputs}=require('/tmp/prepare-chrome-devtools-mcp.js');if(hashBuildInputs(process.cwd())!=='1fb5bfc185af5713a283f210c3d93f815783432c462ad5c96ba368d52e3442c1')process.exit(1)" \
+    && node -e "const {hashBuildInputs}=require('/tmp/prepare-chrome-devtools-mcp.js');if(hashBuildInputs(process.cwd())!=='1483acf6e07cd6246fcceb4035b02f81cdfe2be3838f3cd60d64ff32b3389811')process.exit(1)" \
     && npm ci
 RUN npm run bundle \
     && mkdir -p /src/chrome-devtools-mcp-runtime \
     && cp -R build package.json package-lock.json LICENSE /src/chrome-devtools-mcp-runtime/ \
-    && printf '%s\n' '{"sourceDigest":"1fb5bfc185af5713a283f210c3d93f815783432c462ad5c96ba368d52e3442c1","tag":"chrome-devtools-mcp-v0.16.0","upstreamCommit":"4f7b06898327ab5be42c85bd98bd176f33d55d89","version":"0.16.0"}' > /src/chrome-devtools-mcp-runtime/.ellmsha-chrome-devtools-mcp-pin.json
+    && printf '%s\n' '{"sourceDigest":"1483acf6e07cd6246fcceb4035b02f81cdfe2be3838f3cd60d64ff32b3389811","tag":"chrome-devtools-mcp-v0.16.0","upstreamCommit":"4f7b06898327ab5be42c85bd98bd176f33d55d89","version":"0.16.0"}' > /src/chrome-devtools-mcp-runtime/.ellmsha-chrome-devtools-mcp-pin.json
 
 FROM rust:1.95.0-bookworm AS backend
 RUN apt-get update && apt-get install -y --no-install-recommends cmake pkg-config libssl-dev \
