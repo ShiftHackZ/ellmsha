@@ -6,12 +6,18 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkFlatpak } from './flatpak-preflight.mjs';
+import { macSigning } from './mac-signing.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = new Set(process.argv.slice(2));
 for (const arg of args) {
-  if (!['--plan', '--signed'].includes(arg)) throw new Error(`Unknown argument: ${arg}`);
+  if (!['--plan', '--signed', '--unsigned'].includes(arg)) throw new Error(`Unknown argument: ${arg}`);
 }
+if (args.has('--signed') && args.has('--unsigned')) throw new Error('Choose signed or unsigned, not both');
+const signing = process.platform === 'darwin'
+  ? macSigning({ root, enabled: args.has('--signed'), disabled: args.has('--unsigned') })
+  : null;
+const signed = process.platform === 'darwin' ? Boolean(signing) : args.has('--signed');
 const targets = { darwin: ['--mac', 'dmg', 'zip'], win32: ['--win', 'nsis'], linux: ['--linux', 'flatpak', 'deb'] };
 if (!targets[process.platform] || !['arm64', 'x64'].includes(process.arch)) {
   throw new Error(`Unsupported native target: ${process.platform}-${process.arch}`);
@@ -26,19 +32,40 @@ const env = {
   AIONUI_BACKEND_RUN_ID: '',
   AIONUI_HUB_TAG: 'f9570c40796cc23365970a645c0841b8d2cc7c15',
   // Retain the existing explicit --publish=never in build-with-builder.js.
-  CSC_IDENTITY_AUTO_DISCOVERY: args.has('--signed') ? 'true' : 'false',
+  CSC_IDENTITY_AUTO_DISCOVERY: signed ? 'true' : 'false',
 };
+delete env.ELLM_SHA_SIGNING_REQUIRED;
+delete env.ELLM_SHA_SIGNING_TEAM;
 // rust-lang/rust#157750: stripped proc-macro dylibs cannot load on macOS 27.
 if (process.platform === 'darwin') env.CARGO_PROFILE_RELEASE_STRIP = 'none';
-if (!args.has('--signed')) {
+if (!signed) {
   for (const key of ['CSC_LINK', 'CSC_NAME', 'WIN_CSC_LINK', 'WIN_CSC_NAME', 'APPLE_ID', 'APPLE_API_KEY', 'APPLE_KEYCHAIN', 'appleId', 'appleIdPassword', 'teamId']) delete env[key];
+}
+const signingArgs = [];
+if (signing) {
+  // This host selected an existing Keychain identity, not an imported p12.
+  delete env.CSC_LINK;
+  delete env.CSC_KEY_PASSWORD;
+  env.CSC_NAME = signing.identity;
+  env.ELLM_SHA_SIGNING_TEAM = signing.teamIdentifier;
+  env.ELLM_SHA_SIGNING_REQUIRED = '1';
+  // Xcode-managed Apple Development is for local installations. Public notarized
+  // downloads need a Developer ID Application certificate.
+  signingArgs.push('--config.forceCodeSigning=true', `--config.mac.type=${signing.type}`);
+  if (signing.notaryProfile) {
+    // electron-builder gives Apple ID/API-key variables precedence over a
+    // keychain profile. Honor the explicit host configuration deterministically.
+    for (const key of ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_API_KEY', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER']) delete env[key];
+    env.APPLE_KEYCHAIN_PROFILE = signing.notaryProfile;
+  }
+  else signingArgs.push('--config.mac.notarize=false');
 }
 const steps = [
   ['cargo', ['build', '--locked', '--release', '-p', 'aionui-app', '--bin', 'aioncore'], 'aioncore'],
-  [process.execPath, ['scripts/build-with-builder.js', process.arch, ...targets[process.platform], `--${process.arch}`], 'aionui'],
+  [process.execPath, ['scripts/build-with-builder.js', process.arch, ...targets[process.platform], `--${process.arch}`, ...signingArgs], 'aionui'],
 ];
 if (args.has('--plan')) {
-  console.log(JSON.stringify({ target: `${process.platform}-${process.arch}`, signed: args.has('--signed'), publish: false, steps }, null, 2));
+  console.log(JSON.stringify({ target: `${process.platform}-${process.arch}`, signed, signingType: signing?.type, publish: false, steps }, null, 2));
 } else {
   for (const required of ['aioncore/Cargo.toml', 'aionrs/Cargo.toml', `aionui/node_modules/.bin/electron-builder${process.platform === 'win32' ? '.cmd' : ''}`]) {
     if (!existsSync(path.join(root, required))) throw new Error(`Missing prerequisite: ${required}`);

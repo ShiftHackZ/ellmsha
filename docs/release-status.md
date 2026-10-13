@@ -1,6 +1,36 @@
 # Release readiness — 2026-10-13
 
-This is an evidence ledger for [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md). Publication status and downloadable artifacts are shown on [GitHub Releases](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.13-patch.7). The preceding release is [v2026.10.11 Patch 5](releases/2026.10.11-patch.5.md). Earlier evidence is retained below.
+This ledger tracks installed [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) and earlier releases. Patch 8 and Patch 9 binary releases remain unpublished. The preceding public binary release is [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md), whose downloadable artifacts remain on [GitHub Releases](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.13-patch.7).
+
+## Source publication checks — 2026-10-13
+
+The reviewed Patch 8/9 source changes were pushed to the five affected forks after their applicable publication checks:
+
+- AionCore: required `just push` passed lint/format/migration checks and **8,438 tests**, with 26 skipped.
+- AionRS: required `just push` passed lint/format/Hakari checks and **2,265 tests**, with two skipped.
+- AionUI: required `just push` passed lint, formatting, types, translations and **3,445 tests**, with five skipped.
+- MemoryCore: the three focused retrieval/schema suites passed **29/29** using Zod 4.4.3. BMAD's focused skill validation was already passed and its source was unchanged since that validation.
+- Signing-policy checks passed **2/2**. No private signing material or local acceptance files were added to git.
+
+The UI publication gate required a behavior-preserving rewrite of control-character path validation and two formatting corrections. These source-only corrections have automated coverage; this publication step did not rebuild or reinstall the signed candidate. Installed native acceptance and artifact hashes below still identify the previously built candidate. New CI/release automation and the simplified full-installer download flow remain researched follow-up work.
+
+## Installed, unpublished — 2026-10-13 Patch 9
+
+Signed package installation preserved the real profile and 173 chats. Native checks passed in-app popup tabs, POST/opener/WindowProxy behavior, parent-close survival, Google address search and readable Agents logos in Light/Dark. The clipped tab-context-menu issue found during acceptance was repaired, rebuilt and independently checked in the installed app: correct placement, complete menu and Close Left/child-close behavior passed. YubiKey remains open; no hardware authentication success is claimed. Source/test and installed evidence boundaries are in the [Patch 9 notes](releases/2026.10.13-patch.9.md).
+
+## Unpublished candidate — 2026-10-13 Patch 8
+
+The final signed candidate, including the rule-selection correction, was built and installed in `/Applications/eLLMsha.app` after all 172 chats became idle, preserving the real profile. **Package verification and bounded final installed fresh-chat/same-chat continuation recall checks passed.** No source push or release publication is claimed.
+
+- Changes cover browser form/popup behavior, exact MCP approvals across chats with list/revoke controls, managed Linear routing, project rules and continuation retrieval, memory-artifact preview, history anchoring and native UI labels.
+- An installed GPT-6-Luna fixture passed the exact-tool approval lifecycle: confirmation followed by the evaluator's Always choice, reuse in a fresh chat without another prompt, a different tool still prompting, and revocation restoring the prompt. Both QA chats and all earlier stopped trials are retained. This is same-process fresh-chat/revocation evidence; application-restart persistence, native-adapter live behavior and different managed-account live isolation were not established by that run.
+- Managed Linear collision protection applies to actual discovered Codex apps IDs, not arbitrary direct MCP servers or plugin routes. Catalog failure degrades to guidance without blocking the chat. Authenticated commercial Linear suppression remains unverified.
+- The first installed recall trial failed to deliver the relevant release-date rule and widened scope on a negated cross-project instruction. The final correction has Rust recall **30/30**, MemoryCore **29/29**, a final scope regression, focused Clippy and independent review coverage. In final installed QA chat `606646e7`, both the fresh lookup and short continuation delivered the active project rule, kept `current_project` scope and reported missing exact evidence for the synthetic issue. The evaluator inspected correct, source-citing answers with no tool calls. Guidance was explicitly partial: **4 of 37 candidates**, `complete=false`, `next_offset=4`, with source truncation marked. This is bounded acceptance, not delivery of all rules or universal recall reliability.
+- Earlier full-suite coverage recorded AionUI **3,425 passed / 5 skipped** and AionCore **8,437 passed** across the initial run, remaining packages and repaired Office package. The original workspace command failed one Office port-race test; the test-only isolation repair retained exact expectations and the entire Office package then passed **167/167**. These are aggregate earlier gates, not a repeated full-workspace run after the final recall correction. Failed evidence remains retained.
+- Native disposable Electron fixtures passed SPA clicks, same-tab POST, popup POST and opener communication. Settings and selected-tab styling were inspected in the installed app. Real provider sign-in and hardware-key authentication remain unverified.
+- The final macOS arm64 DMG is **799,637,588 bytes** and ZIP is **832,462,198 bytes**; [candidate notes](releases/2026.10.13-patch.8.md#final-local-artifacts) record SHA-256 hashes. Reviewed source hashes match the final build freeze. App/helper signatures passed strict verification and retain the preceding certificate-signed Patch 8 designated requirements. This is host-local Apple Development signing, not Developer ID notarization or proof of arbitrary future macOS permission retention.
+
+Local evidence: `.data/acceptance/patch8-live-2026-10-13/`. Commercial projects were not test fixtures; previous package/install records and failed trials remain available.
 
 ## Patch 7 — 2026-10-13
 

@@ -26,7 +26,7 @@ node scripts/release/build.mjs
 node scripts/release/verify-artifacts.mjs
 ```
 
-The default build is unsigned and does not publish. It compiles the local Rust backend with the locked dependency graph, then invokes the existing desktop packager, including its bundled-resource checks. Artifacts go to `aionui/out`. The manual `Desktop packages` workflow builds macOS arm64, Windows x64 and Linux x64 packages and uploads workflow artifacts; it never creates a GitHub release. Artifact visibility follows repository permissions.
+The build never publishes. On macOS, an external host signing configuration opts this machine into signed builds by default; without it, the build is unsigned. It compiles the local Rust backend with the locked dependency graph, then invokes the existing desktop packager, including its bundled-resource checks. Artifacts go to `aionui/out`. The manual `Desktop packages` workflow builds macOS arm64, Windows x64 and Linux x64 packages and uploads workflow artifacts; it never creates a GitHub release. Artifact visibility follows repository permissions.
 
 | Build host | Artifacts |
 | --- | --- |
@@ -36,7 +36,25 @@ The default build is unsigned and does not publish. It compiles the local Rust b
 
 Use a native host for each OS and architecture. Cross-compilation is deliberately rejected by the desktop runtime preparer. Install Rust (the repository toolchain), Node.js/npm, Bun, Python and the platform C/C++ toolchain first. Computer Use additionally needs Swift on macOS or Go on Windows/Linux. Linux Flatpak builds require `flatpak`, `flatpak-builder`, the Freedesktop SDK/Platform 26.08 and Electron2 BaseApp 26.08.
 
-Signing is opt-in with `--signed`, using the standard electron-builder signing/notarization environment on the build host. Never put signing credentials in the repository. Signing and actual Windows/Linux installation must be verified on their respective hosts before describing artifacts as release-tested.
+### macOS signing on the build host
+
+Keep the private key in the login Keychain managed by Xcode. Configure only its public selector in `~/.config/ellmsha/mac-signing.json` (mode 600), or select another file outside the checkout with `ELLM_SHA_MAC_SIGNING_CONFIG`:
+
+```json
+{
+  "identity": "Apple Development: Your Name (CERTIFICATE_ID)",
+  "teamIdentifier": "YOURTEAMID",
+  "type": "development"
+}
+```
+
+`node scripts/release/build.mjs` then signs by default on that host. `--signed` requires the external configuration; `--unsigned` is an explicit unsigned build. The signed build fails if signing fails or if the main app or Computer Use helper has an ad-hoc signature, unexpected team, or hash-only designated requirement. It never repairs a failed certificate signature by silently using ad-hoc signing.
+
+An Xcode-managed Apple Development identity supports local installations. It is **not** a notarized public distribution identity. Public distribution requires a Developer ID Application identity (`type: "distribution"`) and, for notarization, an optional `notaryProfile` naming credentials already held in Keychain. Do not put account credentials, certificates, private keys, provisioning profiles or machine-specific configuration in this repository.
+
+Keep bundle identifiers and the certificate-based designated requirements stable between updates. Moving from a previous ad-hoc build to certificate signing is an identity transition: macOS may require permission once again. Signing does not grant permissions or guarantee that an expired/changed certificate will retain consent. Verify the actual main app and helper after packaging; never reset TCC as a build step.
+
+Signing and actual Windows/Linux installation must be verified on their respective hosts before describing artifacts as release-tested.
 
 The artifact verifier requires **every** expected format for the current version and host architecture, then writes a SHA-256 manifest beside the packages. This catches a missing Flatpak even if the DEB build succeeds. Checksums verify downloaded bytes; they do not replace signing or installation tests. CI also probes the real npm launcher on each host before building, including Windows' `npm.cmd` entry point through Node.
 
