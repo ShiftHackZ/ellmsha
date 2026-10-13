@@ -17,7 +17,10 @@ function resolveLocalPackageBin(directory, name) {
 
 // Run the installed JS entry directly: no npm download or OS-specific shim/shell.
 function runLocalPackageBin(directory, name, args, options = {}) {
-  return execFileSync(process.execPath, [resolveLocalPackageBin(directory, name), ...args], {
+  const preload = process.platform === 'darwin' && name === 'electron-builder' && (options.env || process.env).ELLM_SHA_SIGNING_REQUIRED === '1'
+    ? ['--require', path.join(__dirname, 'release/mac-signing-fs.cjs')]
+    : [];
+  return execFileSync(process.execPath, [...preload, resolveLocalPackageBin(directory, name), ...args], {
     ...options,
     cwd: directory,
     shell: false,

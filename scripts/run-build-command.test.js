@@ -58,3 +58,37 @@ test('a missing checkout-local package never falls back to a parent installation
   writeFileSync(path.join(parentPackage, 'cli.cjs'), 'throw Error("must not execute");');
   assert.throws(() => resolveLocalPackageBin(path.join(temp, 'child'), 'fixture-cli'), /fixture-cli local package/);
 });
+
+test('only signed macOS builder children preload the installed dependency file-open queue', { skip: process.platform !== 'darwin' }, (t) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'ellmsha signed builder & '));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  for (const name of ['electron-builder', 'electron-vite', 'fs-extra', 'graceful-fs']) {
+    const entry = path.join(directory, 'node_modules', name);
+    mkdirSync(entry, { recursive: true });
+    writeFileSync(path.join(entry, 'package.json'), JSON.stringify({ main: 'index.cjs', bin: 'index.cjs' }));
+  }
+  writeFileSync(path.join(directory, 'node_modules/fs-extra/index.cjs'), 'module.exports = {};');
+  writeFileSync(path.join(directory, 'node_modules/graceful-fs/index.cjs'), `
+    const fs = require('node:fs');
+    const original = fs.open;
+    exports.open = function (...args) { return original(...args); };
+    exports.open.queuedFixture = true;
+  `);
+  const cli = `
+    const fs = require('node:fs');
+    fs.open('missing-fixture-file', 'r', (error) => console.log(JSON.stringify({
+      queued: Boolean(fs.open.queuedFixture), error: error.code, args: process.argv.slice(2)
+    })));
+  `;
+  for (const name of ['electron-builder', 'electron-vite']) writeFileSync(path.join(directory, 'node_modules', name, 'index.cjs'), cli);
+  for (const [name, signed, args] of [
+    ['electron-builder', '1', ['--mac', 'dmg', 'zip']],
+    ['electron-builder', '1', ['--prepackaged', 'literal & App Folder/eLLMsha.app', '--mac', 'dmg', 'zip']],
+    ['electron-builder', '0', ['--mac', 'dmg', 'zip']],
+    ['electron-vite', '1', ['build']],
+  ]) {
+    const output = runLocalPackageBin(directory, name, args, { encoding: 'utf8', env: { ...process.env, ELLM_SHA_SIGNING_REQUIRED: signed } });
+    const result = JSON.parse(output.trim().split('\n').at(-1));
+    assert.deepEqual(result, { queued: name === 'electron-builder' && signed === '1', error: 'ENOENT', args });
+  }
+});
