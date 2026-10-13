@@ -41,7 +41,8 @@ test('a shim cannot hide a missing package CLI', (t) => {
   assert.throws(() => checkBuildPrerequisites(root, 'win32'), /electron-builder package CLI entry/);
 });
 
-test('package metadata and .bunx alone cannot hide a missing executable shim', (t) => {
+test('direct JS execution does not require package-manager executable shims', (t) => {
   const { root } = fixture(t, '.bunx');
-  assert.throws(() => checkBuildPrerequisites(root, 'win32'), /electron-builder executable shim/);
+  rmSync(path.join(root, 'aionui/node_modules/.bin'), { recursive: true });
+  assert.doesNotThrow(() => checkBuildPrerequisites(root));
 });

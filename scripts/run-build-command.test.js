@@ -1,6 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { runBuildCommand } = require('./run-build-command');
+const { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
+const { runBuildCommand, resolveLocalPackageBin, runLocalPackageBin } = require('./run-build-command');
 
 test('Windows npm uses Node, preserves arguments and never invokes a shell', () => {
   const calls = [];
@@ -26,4 +29,32 @@ test('native executables and Unix npm keep their existing invocation', () => {
 
 test('missing Windows npm fails before starting a build', () => {
   assert.throws(() => runBuildCommand('npm', ['ci'], {}, 'win32', () => ''), /npm CLI/);
+});
+
+test('local npm and Bun package CLIs preserve spaced paths and literal arguments without shims', (t) => {
+  const temp = mkdtempSync(path.join(tmpdir(), 'ellmsha package cli & '));
+  t.after(() => rmSync(temp, { recursive: true, force: true }));
+  for (const layout of ['npm', 'bun']) {
+    const directory = path.join(temp, layout);
+    const localPackage = path.join(directory, 'node_modules/fixture-cli');
+    const packageDirectory = layout === 'bun' ? path.join(directory, 'node_modules/.bun/fixture-cli/node_modules/fixture-cli') : localPackage;
+    mkdirSync(packageDirectory, { recursive: true });
+    writeFileSync(path.join(packageDirectory, 'package.json'), JSON.stringify({ bin: { 'fixture-cli': 'cli.cjs' } }));
+    writeFileSync(path.join(packageDirectory, 'cli.cjs'), 'console.log(JSON.stringify({args:process.argv.slice(2),cwd:process.cwd()}));');
+    if (layout === 'bun') symlinkSync(packageDirectory, localPackage, 'junction');
+    const args = ['--prepackaged', 'C:\\App Folder\\eLLMsha.app', '--config.nsis.include=literal & value', '$(not-a-command)'];
+    const result = JSON.parse(runLocalPackageBin(directory, 'fixture-cli', args, { encoding: 'utf8', shell: true }));
+    assert.deepEqual(result.args, args);
+    assert.equal(realpathSync(result.cwd), realpathSync(directory));
+  }
+});
+
+test('a missing checkout-local package never falls back to a parent installation', (t) => {
+  const temp = mkdtempSync(path.join(tmpdir(), 'ellmsha-local-cli-'));
+  t.after(() => rmSync(temp, { recursive: true, force: true }));
+  const parentPackage = path.join(temp, 'node_modules/fixture-cli');
+  mkdirSync(parentPackage, { recursive: true });
+  writeFileSync(path.join(parentPackage, 'package.json'), JSON.stringify({ bin: 'cli.cjs' }));
+  writeFileSync(path.join(parentPackage, 'cli.cjs'), 'throw Error("must not execute");');
+  assert.throws(() => resolveLocalPackageBin(path.join(temp, 'child'), 'fixture-cli'), /fixture-cli local package/);
 });
