@@ -58,11 +58,18 @@ Signing and actual Windows/Linux installation must be verified on their respecti
 
 ## GitHub Actions release pipeline
 
-Open **Actions → Release installers and VPS images → Run workflow** with `publish=false` (the default) to verify an exact checkout without signing secrets or publication. This produces unsigned macOS arm64 DMG/ZIP, Windows x64 NSIS EXE, per-platform `SHA256SUMS-*.txt`, public build provenance, and a Linux/amd64 image manifest. The image job also runs disposable service smoke tests. Workflow artifacts are retained for 14 days. A successful build does not establish native installation or account-login acceptance.
+Open **Actions → Release installers and VPS images → Run workflow** with `publish=false` (the default) to verify installers without publishing a release or pushing GHCR images. Every run produces **Developer ID signed and notarized macOS arm64 DMG/ZIP** and **unsigned Windows x64 NSIS EXE**. macOS verification uses the same temporary keychain, signed build, stapled-ticket validation and Gatekeeper assessment as publication. The pipeline also produces per-platform `SHA256SUMS-*.txt`, build provenance including the signing policy and actual result, and a Linux/amd64 image manifest. The image job runs disposable service smoke tests. Workflow artifacts are retained for 14 days. A successful build does not establish native installation or account-login acceptance.
 
-The workflow has no pull-request trigger. Public publication requires the official `ShiftHackZ/ellmsha` repository, an exact `vYYYY.MM.DD-patch.N` tag, matching package/About metadata and release notes at `docs/releases/YYYY.MM.DD-patch.N.md`. The version's date must equal the publication day in **Europe/Kyiv**. Manual unsigned runs accept a candidate's earlier date; bump the metadata before tagging if publication moves to another day. Both preflight and the final publication job check the date, root SHA and every recursive gitlink. Changed fork revisions must already be available from their public remotes.
+| Run | `publish` | Result |
+| --- | --- | --- |
+| Default manual verification | `false` | Signed/notarized macOS and unsigned Windows artifacts; no GitHub/GHCR publication |
+| Exact-tag publication | `true` | Same signing policy, plus gated GitHub/GHCR publication |
 
-Configure a GitHub **release** environment (with any desired human protection rules) and these secrets before a public run:
+Every preflight and macOS job uses the **release** environment; the Windows job uses **ci**. All six Apple secrets below are required even for `publish=false`; missing readiness fails preflight before desktop compilation. There is no unsigned macOS workflow mode or Windows signing option. Job names state each platform's signing policy and whether the run is verification or publication. Configuration support is not evidence of a completed signed CI run; inspect that run's signing, notarization and verification results.
+
+The workflow has no pull-request trigger. Public publication requires the official `ShiftHackZ/ellmsha` repository, an exact `vYYYY.MM.DD-patch.N` tag, matching package/About metadata and release notes at `docs/releases/YYYY.MM.DD-patch.N.md`. The version's date must equal the publication day in **Europe/Kyiv**. Manual verification runs accept a candidate's earlier date; bump the metadata before tagging if publication moves to another day. Both preflight and the final publication job check the date, root SHA and every recursive gitlink. Changed fork revisions must already be available from their public remotes.
+
+Configure a GitHub **release** environment (with any desired human protection rules) and these secrets before signed verification or publication:
 
 | Secret | Value |
 | --- | --- |
@@ -73,9 +80,9 @@ Configure a GitHub **release** environment (with any desired human protection ru
 | `MAC_NOTARY_APPLE_ID` | Apple account used by notarization |
 | `MAC_NOTARY_APP_PASSWORD` | Its app-specific password |
 
-Apple Development certificates are sufficient for local development signing, but this CI public-release path rejects them. The job imports the P12 into a temporary runner keychain and stores notarization credentials there. Only a public signing selector is exported to the build; certificate bytes are removed after import. An `always()` cleanup restores the original keychain search list and removes temporary signing files. These files are outside the checkout, caches and uploaded artifact paths. The build verifies the main app/helper signatures; CI additionally validates the stapled ticket and Gatekeeper assessment before accepting macOS artifacts.
+Apple Development certificates are sufficient for local development signing, but CI rejects them. The job imports the P12 into a temporary runner keychain and stores notarization credentials there. Only a public signing selector is exported to the build; certificate bytes are removed after import. An `always()` cleanup restores the original keychain search list and removes temporary signing files, including after failed verification. These files are outside the checkout, caches and uploaded artifact paths. The build verifies the main app/helper signatures; CI additionally validates the stapled ticket and Gatekeeper assessment before accepting macOS artifacts.
 
-Windows signing is optional and reported separately in its build metadata. To require Authenticode on public Windows builds, set environment variable `WINDOWS_SIGNING_ENABLED=true` and secrets `WINDOWS_CERTIFICATE_P12_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD`. The build then fails if signing is unavailable, and CI verifies the installer and unpacked executable. Without that opt-in Windows artifacts are explicitly marked unsigned.
+Windows builds always use `--unsigned` and their metadata records that disposition. No Windows certificate is required or consumed by this workflow.
 
 Desktop jobs must both succeed before candidate images are pushed to GHCR. The reusable [Docker workflow](../../.github/workflows/docker-images.yml) publishes immutable version/source tags and an `images.json` digest manifest; it never promotes `latest`. The final job verifies installer hashes and all image identities against the same root SHA, stages a GitHub draft, then publishes it. An interrupted draft can be resumed only for the same tag and exact source; an already published release is never overwritten. Publication and image promotion are serialized across tags, and a release older than the current stable `latest` is rejected. Only after publication are the manifest's exact image digests promoted to `latest`. A failed later stage can leave candidate image tags or an unpublished draft for inspection; neither is silently deleted.
 

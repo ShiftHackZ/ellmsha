@@ -35,7 +35,7 @@ export async function inspectArtifacts(directory, version, target) {
 export async function stageArtifacts({ sourceFile, directory, output, target, signing }) {
   const source = JSON.parse(await readFile(sourceFile, 'utf8'));
   if (!['unsigned', 'authenticode', 'developer-id-notarized'].includes(signing)) throw new Error('Unknown signing disposition');
-  if (source.publish && target === 'mac-arm64' && signing !== 'developer-id-notarized') throw new Error('Public macOS artifact must be signed and notarized');
+  if (target === 'mac-arm64' && signing !== 'developer-id-notarized') throw new Error('Every CI macOS artifact must be signed and notarized');
   const { checksumName, files } = await inspectArtifacts(directory, source.version, target);
   await mkdir(output, { recursive: true });
   for (const name of [...files.map((item) => item.name), checksumName]) await copyFile(path.join(directory, name), path.join(output, name));
@@ -51,7 +51,7 @@ export async function verifyReleaseArtifacts({ directory, source }) {
     const actual = await inspectArtifacts(directory, source.version, target);
     if (metadata.version !== source.version || metadata.source.commit !== source.source.commit || metadata.target !== target || JSON.stringify(metadata.source.submodules) !== JSON.stringify(source.source.submodules)) throw new Error('Installer source provenance differs from release checkout');
     if (JSON.stringify(metadata.files) !== JSON.stringify(actual.files)) throw new Error('Installer build metadata differs from actual bytes');
-    if (source.publish && target === 'mac-arm64' && metadata.signing !== 'developer-id-notarized') throw new Error('Refusing unsigned macOS publication');
+    if (target === 'mac-arm64' && metadata.signing !== 'developer-id-notarized') throw new Error('Refusing unsigned macOS artifact for verification/publication');
     builds.push(metadata);
   }
   return builds;

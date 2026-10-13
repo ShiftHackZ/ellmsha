@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectSource, parseSubmodules, releaseDate, validateRelease } from './ci-preflight.mjs';
+import { collectSource, MAC_SIGNING_SECRETS, parseSubmodules, releaseDate, resolveReleaseMode, validateRelease } from './ci-preflight.mjs';
 
 const input = { version: '2026.10.13-patch.10', branding: { version: '2026.10.13', patch: 10 }, event: 'push', ref: 'refs/tags/v2026.10.13-patch.10', repository: 'ShiftHackZ/ellmsha', publish: true, now: new Date('2026-10-13T12:00:00Z') };
 test('official exact tag and About metadata pass; publication uses Kyiv date', () => {
@@ -11,10 +11,31 @@ test('official exact tag and About metadata pass; publication uses Kyiv date', (
   assert.throws(() => validateRelease({ ...input, ref: 'refs/heads/main' }), /exact tag/);
   assert.throws(() => validateRelease({ ...input, repository: 'someone/fork' }), /official/);
 });
-test('manual unsigned verification accepts candidate dates but never PR events', () => {
+test('manual verification accepts candidate dates but never PR events', () => {
   assert.equal(validateRelease({ ...input, event: 'workflow_dispatch', ref: 'refs/heads/main', publish: false, now: new Date('2026-11-02T12:00:00Z') }).publish, false);
   for (const event of ['pull_request', 'pull_request_target', 'workflow_run']) assert.throws(() => validateRelease({ ...input, event, publish: false }), /only tag push/);
   for (const version of ['2026.02.30-patch.1', '2026.13.01-patch.1', '2026.10.13-patch.0', '2026.10.13-patch.1;echo x']) assert.throws(() => validateRelease({ ...input, version }));
+});
+test('all runs sign macOS while only publication requires the release tag and date', () => {
+  assert.deepEqual(resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch' }), { publish: false, signMacos: true });
+  for (const event of ['workflow_dispatch', 'push']) {
+    for (const publish of [false, true]) {
+      const mode = resolveReleaseMode({ GITHUB_EVENT_NAME: event, RELEASE_PUBLISH: String(publish) });
+      assert.deepEqual(mode, { publish: event === 'push' || publish, signMacos: true });
+    }
+  }
+  const mode = resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch', RELEASE_PUBLISH: 'false' });
+  assert.equal(validateRelease({ ...input, ...mode, event: 'workflow_dispatch', ref: 'refs/heads/main', now: new Date('2026-11-02T12:00:00Z') }).publish, false);
+});
+test('every preflight fails early without all six secrets, including non-publishing runs', () => {
+  const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', RELEASE_PUBLISH: 'false', REQUIRE_SIGNING_SECRETS: 'true' };
+  assert.throws(() => resolveReleaseMode(env), (error) => MAC_SIGNING_SECRETS.every((name) => error.message.includes(name)));
+  assert.deepEqual(resolveReleaseMode({ ...env, MAC_SIGNING_READY: 'true' }), { publish: false, signMacos: true });
+  assert.throws(() => resolveReleaseMode({ ...env, RELEASE_SIGN_MACOS: 'false' }), /requires Developer ID/);
+  assert.throws(() => resolveReleaseMode({ ...env, RELEASE_PUBLISH: 'true' }), /requires Developer ID/);
+  assert.throws(() => resolveReleaseMode({ ...env, GITHUB_EVENT_NAME: 'push' }), /requires Developer ID/);
+  assert.throws(() => resolveReleaseMode({ ...env, MAC_SIGNING_READY: 'false' }), /requires Developer ID/);
+  assert.throws(() => resolveReleaseMode({ ...env, GITHUB_EVENT_NAME: 'pull_request', MAC_SIGNING_READY: 'true' }), /only tag push/);
 });
 test('source provenance rejects missing, moved, conflicted or modified gitlinks', () => {
   const sha = 'a'.repeat(40);

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Publish from the matching release tag (requires Developer ID + notarization secrets). False builds unsigned verification artifacts only.'
+        description: 'Publish GitHub release and GHCR images from the matching release tag. Always requires signed/notarized macOS artifacts.'
         type: boolean
         default: false
 
@@ -20,7 +20,7 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-24.04
-    environment: ${{ (github.event_name == 'push' || inputs.publish) && 'release' || 'ci' }}
+    environment: release
     outputs:
       version: ${{ steps.source.outputs.version }}
       tag: ${{ steps.source.outputs.tag }}
@@ -54,16 +54,20 @@ jobs:
 
   desktop:
     needs: preflight
-    name: ${{ matrix.target }} (${{ needs.preflight.outputs.publish == 'true' && 'release' || 'unsigned verification' }})
-    environment: ${{ needs.preflight.outputs.publish == 'true' && 'release' || 'ci' }}
+    name: ${{ matrix.target }} (${{ matrix.signing }}; ${{ needs.preflight.outputs.publish == 'true' && 'release' || 'verification' }})
+    environment: ${{ matrix.environment }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-15
             target: mac-arm64
+            signing: signed + notarized
+            environment: release
           - os: windows-2022
             target: win-x64
+            signing: unsigned
+            environment: ci
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     defaults:
@@ -136,7 +140,7 @@ jobs:
         working-directory: aionui
         run: bun install --frozen-lockfile
       - name: Prepare ephemeral Developer ID keychain and notarization
-        if: runner.os == 'macOS' && needs.preflight.outputs.publish == 'true'
+        if: runner.os == 'macOS'
         env:
           MAC_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -148,42 +152,17 @@ jobs:
       - name: Build macOS installers
         if: runner.os == 'macOS'
         run: |
-          if [ "$RELEASE_PUBLISH" = true ]; then
-            node scripts/release/build.mjs --signed
-            xcrun stapler validate aionui/out/mac-arm64/eLLMsha.app
-            spctl --assess --type execute --verbose=2 aionui/out/mac-arm64/eLLMsha.app
-            echo 'RELEASE_SIGNING=developer-id-notarized' >> "$GITHUB_ENV"
-          else
-            node scripts/release/build.mjs --unsigned
-            echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
-          fi
+          node scripts/release/build.mjs --signed
+          xcrun stapler validate aionui/out/mac-arm64/eLLMsha.app
+          spctl --assess --type execute --verbose=2 aionui/out/mac-arm64/eLLMsha.app
+          echo 'RELEASE_SIGNING=developer-id-notarized' >> "$GITHUB_ENV"
       - name: Build Windows x86_64 installer
         if: runner.os == 'Windows'
-        env:
-          WINDOWS_SIGNING_ENABLED: ${{ needs.preflight.outputs.publish == 'true' && vars.WINDOWS_SIGNING_ENABLED == 'true' }}
-          WIN_CSC_LINK: ${{ needs.preflight.outputs.publish == 'true' && vars.WINDOWS_SIGNING_ENABLED == 'true' && secrets.WINDOWS_CERTIFICATE_P12_BASE64 || '' }}
-          WIN_CSC_KEY_PASSWORD: ${{ needs.preflight.outputs.publish == 'true' && vars.WINDOWS_SIGNING_ENABLED == 'true' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
         run: |
           test "$(node -p process.arch)" = x64
           node -e "require('./scripts/run-build-command').runBuildCommand('npm', ['--version'], {stdio:'inherit'})"
-          if [ "$WINDOWS_SIGNING_ENABLED" = true ]; then
-            test -n "$WIN_CSC_LINK" && test -n "$WIN_CSC_KEY_PASSWORD"
-            node scripts/release/build.mjs --signed
-            echo 'RELEASE_SIGNING=authenticode' >> "$GITHUB_ENV"
-          else
-            node scripts/release/build.mjs --unsigned
-            echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
-          fi
-      - name: Verify optional Windows signature
-        if: runner.os == 'Windows' && env.RELEASE_SIGNING == 'authenticode'
-        shell: pwsh
-        env:
-          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          foreach ($file in @("aionui/out/eLLMsha-$env:RELEASE_VERSION-win-x64.exe", 'aionui/out/win-unpacked/eLLMsha.exe')) {
-            if ((Get-AuthenticodeSignature -LiteralPath $file).Status -ne 'Valid') { throw 'Invalid Windows artifact signature' }
-          }
+          node scripts/release/build.mjs --unsigned
+          echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
       - name: Verify all installers and stage exact public files
         run: |
           node scripts/release/verify-artifacts.mjs
@@ -208,7 +187,7 @@ jobs:
             ${{ runner.temp }}/electron-builder-cache
           key: ${{ steps.desktop-cache.outputs.cache-primary-key }}
       - name: Remove temporary signing material
-        if: always() && runner.os == 'macOS' && needs.preflight.outputs.publish == 'true'
+        if: always() && runner.os == 'macOS'
         run: node scripts/release/ci-macos-signing.mjs cleanup
 
   images:

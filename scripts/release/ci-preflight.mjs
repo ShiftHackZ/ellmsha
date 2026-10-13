@@ -10,6 +10,15 @@ export const MAC_SIGNING_SECRETS = [
   'MAC_TEAM_ID', 'MAC_NOTARY_APPLE_ID', 'MAC_NOTARY_APP_PASSWORD',
 ];
 
+export function resolveReleaseMode(env) {
+  if (!['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)) throw new Error('Release workflow accepts only tag push or manual dispatch');
+  const publish = env.GITHUB_EVENT_NAME === 'push' || env.RELEASE_PUBLISH === 'true';
+  if (env.REQUIRE_SIGNING_SECRETS === 'true' && env.MAC_SIGNING_READY !== 'true') {
+    throw new Error(`Signed macOS verification/publication requires Developer ID/notarization secrets: ${MAC_SIGNING_SECRETS.join(', ')}`);
+  }
+  return { publish, signMacos: true };
+}
+
 export function releaseDate(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', year: 'numeric', month: '2-digit', day: '2-digit' })
     .format(now).replaceAll('-', '.');
@@ -54,22 +63,19 @@ export function collectSource(root, runGit = (args, cwd = root) => execFileSync(
 }
 
 export function main(env = process.env) {
+  const { publish, signMacos } = resolveReleaseMode(env);
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const version = JSON.parse(readFileSync(path.join(root, 'aionui/package.json'), 'utf8')).version;
   const branding = JSON.parse(readFileSync(path.join(root, 'aionui/packages/desktop/src/common/branding/release.json'), 'utf8'));
-  const publish = env.GITHUB_EVENT_NAME === 'push' || env.RELEASE_PUBLISH === 'true';
   const release = validateRelease({ version, branding, event: env.GITHUB_EVENT_NAME, ref: env.GITHUB_REF, repository: env.GITHUB_REPOSITORY, publish });
   const source = { ...collectSource(root), repository: env.GITHUB_REPOSITORY };
   if (env.RELEASE_SOURCE_REF && source.commit !== env.RELEASE_SOURCE_REF) throw new Error('Build checkout differs from the preflight source commit');
   if (publish) {
     const tagCommit = execFileSync('git', ['rev-parse', `${release.tag}^{commit}`], { cwd: root, encoding: 'utf8' }).trim();
     if (tagCommit !== source.commit) throw new Error('Release tag does not point at this source commit');
-    if (env.REQUIRE_SIGNING_SECRETS === 'true' && env.MAC_SIGNING_READY !== 'true') {
-      throw new Error(`Public macOS release requires Developer ID/notarization secrets: ${MAC_SIGNING_SECRETS.join(', ')}`);
-    }
     readFileSync(path.join(root, 'docs/releases', `${version}.md`));
   }
-  const manifest = { schema: 1, ...release, source, checkedAt: new Date().toISOString() };
+  const manifest = { schema: 1, ...release, signMacos, source, checkedAt: new Date().toISOString() };
   if (env.RELEASE_SOURCE_MANIFEST) writeFileSync(env.RELEASE_SOURCE_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `version=${version}\ntag=${release.tag}\nsource_ref=${source.commit}\npublish=${publish}\n`);
   console.log(JSON.stringify(manifest, null, 2));
