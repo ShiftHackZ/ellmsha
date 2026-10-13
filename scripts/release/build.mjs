@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Build only on the target OS/architecture; never download an upstream backend.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkFlatpak } from './flatpak-preflight.mjs';
 import { macSigning } from './mac-signing.mjs';
+import { checkBuildPrerequisites } from './build-prerequisites.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const args = new Set(process.argv.slice(2));
@@ -68,9 +69,7 @@ const steps = [
 if (args.has('--plan')) {
   console.log(JSON.stringify({ target: `${process.platform}-${process.arch}`, signed, signingType: signing?.type, publish: false, steps }, null, 2));
 } else {
-  for (const required of ['aioncore/Cargo.toml', 'aionrs/Cargo.toml', `aionui/node_modules/.bin/electron-builder${process.platform === 'win32' ? '.cmd' : ''}`]) {
-    if (!existsSync(path.join(root, required))) throw new Error(`Missing prerequisite: ${required}`);
-  }
+  checkBuildPrerequisites(root);
   if (process.platform === 'linux') {
     const require = createRequire(path.join(root, 'aionui/package.json'));
     const config = require('js-yaml').load(readFileSync(path.join(root, 'aionui/packages/desktop/electron-builder.yml'), 'utf8'));
