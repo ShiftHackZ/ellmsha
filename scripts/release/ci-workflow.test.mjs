@@ -17,3 +17,19 @@ test('release credentials and publication are unavailable to pull-request workfl
   assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/release-installers\/\*/);
   assert.doesNotMatch(workflow, /path:.*(?:ellmsha-signing|source-manifest|github\.workspace)/);
 });
+
+test('desktop packaging has a bounded heap inherited by its Node subprocesses', () => {
+  const desktop = workflow.split('\n  desktop:\n')[1].split('\n  images:\n')[0];
+  assert.match(desktop, /\n    env:\n[\s\S]*?NODE_OPTIONS: '--max-old-space-size=4096'/);
+  assert.match(desktop, /CARGO_BUILD_JOBS: '2'/);
+});
+
+test('failed packaging retains the same non-secret cache paths without saving cancelled runs', () => {
+  const restore = workflow.split('uses: actions/cache/restore@')[1].split('\n      - ')[0];
+  const save = workflow.split('uses: actions/cache/save@')[1].split('\n      - ')[0];
+  const paths = (step) => step.match(/          path: \|\n((?:            .+\n)+)/)[1];
+  assert.equal(paths(save), paths(restore));
+  assert.doesNotMatch(paths(save), /signing|keychain|\.p12|source-manifest|release-installers/);
+  assert.match(save, /key: \$\{\{ steps\.desktop-cache\.outputs\.cache-primary-key \}\}/);
+  assert.match(workflow, /Retain build cache after packaging failure\n\s+if: \$\{\{ !cancelled\(\) && steps\.desktop-cache\.outputs\.cache-primary-key != '' && steps\.desktop-cache\.outputs\.cache-hit != 'true' \}\}/);
+});

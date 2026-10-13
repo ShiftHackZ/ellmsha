@@ -71,6 +71,9 @@ jobs:
         shell: bash
     env:
       PUPPETEER_SKIP_DOWNLOAD: 'true'
+      # Rollup's Chrome MCP bundle exceeds V8's default 2 GiB heap. The smallest
+      # desktop runner has 7 GB RAM; Rust and Node packaging run sequentially.
+      NODE_OPTIONS: '--max-old-space-size=4096'
       CARGO_INCREMENTAL: '0'
       CARGO_BUILD_JOBS: '2'
       ELLM_SHA_CARGO_HOME: ${{ github.workspace }}/.data/cargo
@@ -113,7 +116,8 @@ jobs:
       - name: Configure ephemeral build paths
         run: |
           node -e "const fs=require('node:fs'),p=require('node:path');for(const [k,v] of Object.entries({BUN_INSTALL_CACHE_DIR:'bun-cache',NPM_CONFIG_CACHE:'npm-cache',ELECTRON_CACHE:'electron-cache',ELECTRON_BUILDER_CACHE:'electron-builder-cache',RELEASE_SOURCE_MANIFEST:'source-manifest.json',RELEASE_STAGE_DIR:'release-installers'}))fs.appendFileSync(process.env.GITHUB_ENV,k+'='+p.join(process.env.RUNNER_TEMP,v)+'\n')"
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        id: desktop-cache
         with:
           path: |
             .data/cargo/registry
@@ -190,6 +194,19 @@ jobs:
           path: ${{ runner.temp }}/release-installers/*
           if-no-files-found: error
           retention-days: 14
+      - name: Retain build cache after packaging failure
+        if: ${{ !cancelled() && steps.desktop-cache.outputs.cache-primary-key != '' && steps.desktop-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .data/cargo/registry
+            .data/cargo/git
+            aioncore/target
+            ${{ runner.temp }}/bun-cache
+            ${{ runner.temp }}/npm-cache
+            ${{ runner.temp }}/electron-cache
+            ${{ runner.temp }}/electron-builder-cache
+          key: ${{ steps.desktop-cache.outputs.cache-primary-key }}
       - name: Remove temporary signing material
         if: always() && runner.os == 'macOS' && needs.preflight.outputs.publish == 'true'
         run: node scripts/release/ci-macos-signing.mjs cleanup
