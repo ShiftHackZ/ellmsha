@@ -42,6 +42,7 @@ if (!signed) {
   for (const key of ['CSC_LINK', 'CSC_NAME', 'WIN_CSC_LINK', 'WIN_CSC_NAME', 'APPLE_ID', 'APPLE_API_KEY', 'APPLE_KEYCHAIN', 'appleId', 'appleIdPassword', 'teamId']) delete env[key];
 }
 const signingArgs = [];
+if (process.platform === 'win32' && signed) signingArgs.push('--config.forceCodeSigning=true');
 if (signing) {
   // This host selected an existing Keychain identity, not an imported p12.
   delete env.CSC_LINK;

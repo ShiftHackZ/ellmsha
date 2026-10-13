@@ -1,0 +1,269 @@
+name: Release installers and VPS images
+
+on:
+  push:
+    tags: ['v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-patch.*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish from the matching release tag (requires Developer ID + notarization secrets). False builds unsigned verification artifacts only.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    environment: ${{ (github.event_name == 'push' || inputs.publish) && 'release' || 'ci' }}
+    outputs:
+      version: ${{ steps.source.outputs.version }}
+      tag: ${{ steps.source.outputs.tag }}
+      source_ref: ${{ steps.source.outputs.source_ref }}
+      publish: ${{ steps.source.outputs.publish }}
+    steps:
+      - name: Preserve source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.11.0'
+      - name: Check pipeline contracts
+        run: node --test scripts/release/*.test.mjs scripts/run-build-command.test.js
+      - name: Check version, tag, date and exact source refs
+        id: source
+        env:
+          RELEASE_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+          REQUIRE_SIGNING_SECRETS: 'true'
+          MAC_SIGNING_READY: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' && secrets.MAC_SIGNING_IDENTITY != '' && secrets.MAC_TEAM_ID != '' && secrets.MAC_NOTARY_APPLE_ID != '' && secrets.MAC_NOTARY_APP_PASSWORD != '' }}
+        run: node scripts/release/ci-preflight.mjs
+      - name: Verify maintained native fork source pins
+        run: |
+          node scripts/prepare-mobile-mcp.js --verify-only
+          node scripts/prepare-chrome-devtools-mcp.js --verify-only
+          node scripts/prepare-open-computer-use.js --verify-only
+
+  desktop:
+    needs: preflight
+    name: ${{ matrix.target }} (${{ needs.preflight.outputs.publish == 'true' && 'release' || 'unsigned verification' }})
+    environment: ${{ needs.preflight.outputs.publish == 'true' && 'release' || 'ci' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: mac-arm64
+          - os: windows-2022
+            target: win-x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '2'
+      ELLM_SHA_CARGO_HOME: ${{ github.workspace }}/.data/cargo
+      RELEASE_SOURCE_REF: ${{ needs.preflight.outputs.source_ref }}
+      RELEASE_PUBLISH: ${{ needs.preflight.outputs.publish }}
+      RELEASE_TARGET: ${{ matrix.target }}
+    steps:
+      - name: Preserve source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.preflight.outputs.source_ref }}
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.11.0'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.9'
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        if: runner.os == 'Windows'
+        with:
+          go-version: '1.22.12'
+          cache: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12.10'
+      - name: Select Swift 6.2 toolchain
+        if: runner.os == 'macOS'
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcrun swift --version
+          test "$(uname -m)" = arm64
+      - name: Select pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup run 1.95.0 rustc --version
+      - name: Configure ephemeral build paths
+        run: |
+          node -e "const fs=require('node:fs'),p=require('node:path');for(const [k,v] of Object.entries({BUN_INSTALL_CACHE_DIR:'bun-cache',NPM_CONFIG_CACHE:'npm-cache',ELECTRON_CACHE:'electron-cache',ELECTRON_BUILDER_CACHE:'electron-builder-cache',RELEASE_SOURCE_MANIFEST:'source-manifest.json',RELEASE_STAGE_DIR:'release-installers'}))fs.appendFileSync(process.env.GITHUB_ENV,k+'='+p.join(process.env.RUNNER_TEMP,v)+'\n')"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            .data/cargo/registry
+            .data/cargo/git
+            aioncore/target
+            ${{ runner.temp }}/bun-cache
+            ${{ runner.temp }}/npm-cache
+            ${{ runner.temp }}/electron-cache
+            ${{ runner.temp }}/electron-builder-cache
+          key: desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-${{ needs.preflight.outputs.source_ref }}
+          restore-keys: |
+            desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-
+      - name: Record exact checkout provenance
+        run: node scripts/release/ci-preflight.mjs
+      - name: Install locked dependencies
+        working-directory: aionui
+        run: bun install --frozen-lockfile
+      - name: Prepare ephemeral Developer ID keychain and notarization
+        if: runner.os == 'macOS' && needs.preflight.outputs.publish == 'true'
+        env:
+          MAC_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          MAC_TEAM_ID: ${{ secrets.MAC_TEAM_ID }}
+          MAC_NOTARY_APPLE_ID: ${{ secrets.MAC_NOTARY_APPLE_ID }}
+          MAC_NOTARY_APP_PASSWORD: ${{ secrets.MAC_NOTARY_APP_PASSWORD }}
+        run: node scripts/release/ci-macos-signing.mjs setup
+      - name: Build macOS installers
+        if: runner.os == 'macOS'
+        run: |
+          if [ "$RELEASE_PUBLISH" = true ]; then
+            node scripts/release/build.mjs --signed
+            xcrun stapler validate aionui/out/mac-arm64/eLLMsha.app
+            spctl --assess --type execute --verbose=2 aionui/out/mac-arm64/eLLMsha.app
+            echo 'RELEASE_SIGNING=developer-id-notarized' >> "$GITHUB_ENV"
+          else
+            node scripts/release/build.mjs --unsigned
+            echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
+          fi
+      - name: Build Windows x86_64 installer
+        if: runner.os == 'Windows'
+        env:
+          WINDOWS_SIGNING_ENABLED: ${{ needs.preflight.outputs.publish == 'true' && vars.WINDOWS_SIGNING_ENABLED == 'true' }}
+          WIN_CSC_LINK: ${{ needs.preflight.outputs.publish == 'true' && vars.WINDOWS_SIGNING_ENABLED == 'true' && secrets.WINDOWS_CERTIFICATE_P12_BASE64 || '' }}
+          WIN_CSC_KEY_PASSWORD: ${{ needs.preflight.outputs.publish == 'true' && vars.WINDOWS_SIGNING_ENABLED == 'true' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+        run: |
+          test "$(node -p process.arch)" = x64
+          node -e "require('./scripts/run-build-command').runBuildCommand('npm', ['--version'], {stdio:'inherit'})"
+          if [ "$WINDOWS_SIGNING_ENABLED" = true ]; then
+            test -n "$WIN_CSC_LINK" && test -n "$WIN_CSC_KEY_PASSWORD"
+            node scripts/release/build.mjs --signed
+            echo 'RELEASE_SIGNING=authenticode' >> "$GITHUB_ENV"
+          else
+            node scripts/release/build.mjs --unsigned
+            echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
+          fi
+      - name: Verify optional Windows signature
+        if: runner.os == 'Windows' && env.RELEASE_SIGNING == 'authenticode'
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in @("aionui/out/eLLMsha-$env:RELEASE_VERSION-win-x64.exe", 'aionui/out/win-unpacked/eLLMsha.exe')) {
+            if ((Get-AuthenticodeSignature -LiteralPath $file).Status -ne 'Valid') { throw 'Invalid Windows artifact signature' }
+          }
+      - name: Verify all installers and stage exact public files
+        run: |
+          node scripts/release/verify-artifacts.mjs
+          node scripts/release/ci-artifacts.mjs stage
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ellmsha-desktop-${{ matrix.target }}-${{ needs.preflight.outputs.version }}
+          path: ${{ runner.temp }}/release-installers/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary signing material
+        if: always() && runner.os == 'macOS' && needs.preflight.outputs.publish == 'true'
+        run: node scripts/release/ci-macos-signing.mjs cleanup
+
+  images:
+    needs: [preflight, desktop]
+    uses: ./.github/workflows/docker-images.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      version: ${{ needs.preflight.outputs.version }}
+      source_ref: ${{ needs.preflight.outputs.source_ref }}
+      publish: ${{ needs.preflight.outputs.publish == 'true' }}
+
+  publish:
+    needs: [preflight, desktop, images]
+    if: needs.preflight.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    environment: release
+    concurrency:
+      group: official-release-publication
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      packages: write
+    env:
+      RELEASE_PUBLISH: 'true'
+      RELEASE_SOURCE_REF: ${{ needs.preflight.outputs.source_ref }}
+      RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
+      RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+    steps:
+      - name: Preserve source bytes
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.preflight.outputs.source_ref }}
+          submodules: recursive
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.11.0'
+      - name: Configure ephemeral publication paths
+        run: |
+          node -e "const fs=require('node:fs'),p=require('node:path');for(const [k,v] of Object.entries({RELEASE_SOURCE_MANIFEST:'source-manifest.json',RELEASE_STAGE_DIR:'release-assets'}))fs.appendFileSync(process.env.GITHUB_ENV,k+'='+p.join(process.env.RUNNER_TEMP,v)+'\n')"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: ellmsha-desktop-*-${{ needs.preflight.outputs.version }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/release-assets
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.images.outputs.image_manifest_artifact_name }}
+          path: ${{ runner.temp }}/release-assets
+      - name: Recheck publication date, provenance and downloaded installer hashes
+        run: |
+          node scripts/release/ci-preflight.mjs
+          node scripts/release/ci-artifacts.mjs verify
+      - name: Publish complete root release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ShiftHackZ/ellmsha
+        run: node scripts/release/ci-publish.mjs
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Promote verified image digests after release publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ShiftHackZ/ellmsha
+          REGISTRY_USER: ${{ github.actor }}
+        run: node docker/promote-images.mjs --manifest "$RELEASE_STAGE_DIR/images.json" --release-url '${{ steps.release.outputs.url }}'

@@ -12,7 +12,19 @@ The reviewed Patch 8/9 source changes were pushed to the five affected forks aft
 - MemoryCore: the three focused retrieval/schema suites passed **29/29** using Zod 4.4.3. BMAD's focused skill validation was already passed and its source was unchanged since that validation.
 - Signing-policy checks passed **2/2**. No private signing material or local acceptance files were added to git.
 
-The UI publication gate required a behavior-preserving rewrite of control-character path validation and two formatting corrections. These source-only corrections have automated coverage; this publication step did not rebuild or reinstall the signed candidate. Installed native acceptance and artifact hashes below still identify the previously built candidate. New CI/release automation and the simplified full-installer download flow remain researched follow-up work.
+The UI publication gate required a behavior-preserving rewrite of control-character path validation and two formatting corrections. These source-only corrections have automated coverage; this publication step did not rebuild or reinstall the signed candidate. Installed native acceptance and artifact hashes below still identify the previously built candidate. Patch 10 implements CI/release automation and the simplified full-installer download flow; its separate acceptance status follows below.
+
+## Candidate automation — 2026-10-13 Patch 10
+
+[Patch 10 candidate notes](releases/2026.10.13-patch.10.md) describe the new installer and Linux image pipeline. Production remains the installed Patch 9; this work does not restart it or replace its profile.
+
+- The required AionUI `just push` gate passed **3,448 tests / 5 skipped**, strict lint, formatting, types and translations. Updater focused checks passed **64/64**. Independent review found and verified the repair of a cancel/immediate-retry race.
+- The real renderer components were checked in an isolated browser fixture in Light/Dark: titlebar placement, quiet availability check, progress, cancellation, missing installer, metadata error, verification failure/retry and verified-installer action. IPC/downloads/OS opening were mocked; this is not installed-app or real-installer proof.
+- Release helper checks passed **17/17**, and both workflows passed Actionlint. Exact source pins, draft retry, release date and installer checksum contracts have automated coverage.
+- MemoryCore, hub and optional proxy Linux amd64 images were actually built and started on isolated empty storage. The Linux Computer Use stage also built and passed its version/marker check. Full web/Core/RS image and hosted macOS/Windows packages still require the CI dry-run.
+- Public macOS release is fail-closed without Developer ID Application and notarization secrets. The available local Apple Development certificate is insufficient for that distribution path. No signing private key was exported or added to the checkout.
+
+Local evidence: `.data/acceptance/patch10-release-automation-2026-10-13/`, `.data/acceptance/patch10-ci-2026-10-13/`, `.data/acceptance/updater-2026-10-13/`, and `.data/acceptance/release-images-2026-10-13/`.
 
 ## Installed, unpublished — 2026-10-13 Patch 9
 

@@ -1,0 +1,115 @@
+# Pull-only deployment of a published release; keep private configuration external.
+# Run from the repository root with --env-file .env -f docker/compose.release.yaml.
+name: ellmsha-v3
+services:
+  aionui:
+    image: ${ELLM_SHA_WEB_IMAGE:-ghcr.io/shifthackz/ellmsha-web:${ELLM_SHA_VERSION:?Set ELLM_SHA_VERSION to a published release}}
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on:
+      memory-core: { condition: service_healthy }
+      memory-hub: { condition: service_healthy }
+    ports: ["127.0.0.1:${AIONUI_PORT:-3000}:3000"]
+    environment:
+      AIONUI_PORT: "3000"
+      AIONUI_ALLOW_REMOTE: "true"
+      AIONUI_DATA_DIR: /data
+      AIONUI_OPEN_BROWSER: "0"
+      AIONUI_TDAI_MEMORY_CONFIG: /run/ellmsha/aionui-memory.json
+      AIONUI_GENERATION_CALLBACK_ORIGIN: http://aionui:3000
+    volumes:
+      - type: bind
+        source: ../.data/aionui
+        target: /data
+        bind: { create_host_path: false }
+      - ${V3_WORKSPACES_DIR:-../workspaces}:/workspaces
+      - ${KNOWLEDGE_LOCAL_SOURCE_ROOT:-../workspaces}:${KNOWLEDGE_LOCAL_MOUNT_ROOT:-/workspaces/ellmsha-v3}:ro
+      - type: bind
+        source: ../.data/tencentdb/aionui-memory.docker.json
+        target: /run/ellmsha/aionui-memory.json
+        read_only: true
+        bind: { create_host_path: false }
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [memory]
+  memory-core:
+    image: ${MEMORY_CORE_IMAGE:-ghcr.io/shifthackz/ellmsha-memory-core:${ELLM_SHA_VERSION:?Set ELLM_SHA_VERSION}}
+    platform: linux/amd64
+    restart: unless-stopped
+    ports: ["127.0.0.1:${MEMORY_CORE_PORT:-8420}:8420"]
+    environment:
+      AION_LLM_REQUIRE_CONTEXT: "1"
+      AION_LLM_CALLBACK_ALLOWED_HOSTS: aionui
+      TDAI_GATEWAY_PORT: "8420"
+      TDAI_GATEWAY_HOST: 0.0.0.0
+      TDAI_GATEWAY_API_KEY: ${MEMORY_CORE_GATEWAY_API_KEY-}
+      TDAI_DATA_DIR: /data/tdai-memory
+      STORE_MODE: sqlite
+    volumes:
+      - memory-core-data:/data/tdai-memory
+      - type: bind
+        source: ../.data/tencentdb/core-config/tdai-gateway.yaml
+        target: /data/config/tdai-gateway.yaml
+        read_only: true
+        bind: { create_host_path: false }
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [memory]
+  memory-hub:
+    image: ${MEMORY_HUB_IMAGE:-ghcr.io/shifthackz/ellmsha-memory-hub:${ELLM_SHA_VERSION:?Set ELLM_SHA_VERSION}}
+    platform: linux/amd64
+    restart: unless-stopped
+    depends_on:
+      memory-core: { condition: service_healthy }
+    ports: ["127.0.0.1:${PANEL_PORT:-8125}:8125", "127.0.0.1:${KNOWLEDGE_PORT:-8424}:8424"]
+    environment:
+      AION_LLM_REQUIRE_CONTEXT: "1"
+      AION_LLM_CALLBACK_ALLOWED_HOSTS: aionui
+      KNOWLEDGE_SERVICE_KEY: ${KNOWLEDGE_SERVICE_KEY:?Bootstrap the memory stack first}
+      KNOWLEDGE_AUTH_TOKEN: ${KNOWLEDGE_SERVICE_KEY:?Bootstrap the memory stack first}
+      REMOTE_INSTANCE_ID: default
+      REMOTE_INSTANCE_NAME: default
+      REMOTE_INSTANCE_URL: http://memory-core:8420
+      REMOTE_INSTANCE_KEY: ${MEMORY_CORE_GATEWAY_API_KEY:-local}
+      REMOTE_INSTANCE_PROXY_URL: ${MEMORY_HUB_PROXY_PUBLIC_URL:-}
+      LLM_MODE: custom
+      LLM_PROTOCOL: ${MEMORY_LLM_PROTOCOL:-openai}
+      LLM_API_KEY: ${MEMORY_LLM_API_KEY:-}
+      LLM_BASE_URL: ${MEMORY_LLM_BASE_URL:-}
+      LLM_MODEL: ${MEMORY_LLM_MODEL:-}
+      KNOWLEDGE_LLM_BINDING_SYNC: "0"
+    volumes:
+      - panel-data:/data/knowledge
+      - ${KNOWLEDGE_LOCAL_SOURCE_ROOT:-../workspaces}:${KNOWLEDGE_LOCAL_MOUNT_ROOT:-/workspaces/ellmsha-v3}:ro
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [memory]
+  proxy:
+    image: ${PROXY_IMAGE:-ghcr.io/shifthackz/ellmsha-memory-proxy:${ELLM_SHA_VERSION:?Set ELLM_SHA_VERSION}}
+    platform: linux/amd64
+    profiles: [proxy]
+    restart: unless-stopped
+    depends_on:
+      memory-core: { condition: service_healthy }
+      memory-hub: { condition: service_healthy }
+    ports: ["127.0.0.1:${PROXY_PORT:-8096}:8096"]
+    volumes:
+      - proxy-data:/data/tdai-memory-proxy
+      - type: bind
+        source: ../.data/tencentdb/proxy-config/config.yaml
+        target: /data/config.yaml
+        read_only: true
+        bind: { create_host_path: false }
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    networks: [memory]
+networks:
+  memory:
+    external: true
+    name: tdai-memory-stack
+volumes:
+  memory-core-data:
+    external: true
+    name: ${MEMORY_CORE_VOLUME:-ellmsha-v3-memory-core}
+  panel-data:
+    external: true
+    name: ${PANEL_VOLUME:-ellmsha-v3-memory-panel}
+  proxy-data:
+    external: true
+    name: ${PROXY_VOLUME:-ellmsha-v3-memory-proxy}

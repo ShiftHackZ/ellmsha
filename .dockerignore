@@ -22,3 +22,28 @@ open-codex-computer-use/.build
 **/*.log
 **/.DS_Store
 **/__pycache__
+
+# Release contexts must never contain generated profiles, signing material or caches.
+**/.idea
+**/.DS_Store
+**/coverage
+**/test-results
+**/*.p12
+**/*.pfx
+**/*.key
+**/*.pem
+**/*.mobileprovision
+**/*.provisionprofile
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/auth.json
+**/credentials.json
+**/.npmrc
+aionui/resources/tencent-memory
+aionui/resources/codex
+aionui/resources/claude
+# Tencent runtime files are copied explicitly; deployed configuration stays external.
+tencentdb-agent-memory/MemoryCore/tdai-gateway*.yaml
+tencentdb-agent-memory/MemoryPanel/config
+tencentdb-agent-memory/MemoryProxy/config.yaml

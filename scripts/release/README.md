@@ -4,7 +4,7 @@
 
 Use the maintained fork revisions recorded by this checkout. Release commits pin published component revisions; do not replace them with upstream to get a clean clone building. See [release status](../../docs/release-status.md).
 
-Install the native toolchains described below. The current CI configuration pins Node.js 22.20.0, Bun 1.3.9, Python 3.12 and Go 1.22.12; AionCore selects Rust 1.95.0 through its `rust-toolchain.toml`. These are the configured build inputs, not a claim that every platform CI job has passed.
+Install the native toolchains described below. CI pins Node.js 24.11.0, Bun 1.3.9, Python 3.12.10, Go 1.22.12 and Rust 1.95.0. The macOS arm64 job selects Xcode 26.2 (Swift 6.2) on `macos-15`; Windows x64 uses `windows-2022`. These are configured inputs, not a claim that the hosted jobs have passed.
 
 From the repository root, install the locked frontend dependencies:
 
@@ -26,7 +26,7 @@ node scripts/release/build.mjs
 node scripts/release/verify-artifacts.mjs
 ```
 
-The build never publishes. On macOS, an external host signing configuration opts this machine into signed builds by default; without it, the build is unsigned. It compiles the local Rust backend with the locked dependency graph, then invokes the existing desktop packager, including its bundled-resource checks. Artifacts go to `aionui/out`. The manual `Desktop packages` workflow builds macOS arm64, Windows x64 and Linux x64 packages and uploads workflow artifacts; it never creates a GitHub release. Artifact visibility follows repository permissions.
+The build script never publishes. On macOS, an external host signing configuration opts this machine into signed builds by default; without it, the build is unsigned. It compiles the local Rust backend with the locked dependency graph, then invokes the existing desktop packager, including its bundled-resource checks. Artifacts go to `aionui/out`. The `Release installers and VPS images` workflow described below replaces the former desktop-packages workflow. Linux desktop packages remain available through the local build script; CI targets Linux VPS images instead.
 
 | Build host | Artifacts |
 | --- | --- |
@@ -55,6 +55,40 @@ An Xcode-managed Apple Development identity supports local installations. It is 
 Keep bundle identifiers and the certificate-based designated requirements stable between updates. Moving from a previous ad-hoc build to certificate signing is an identity transition: macOS may require permission once again. Signing does not grant permissions or guarantee that an expired/changed certificate will retain consent. Verify the actual main app and helper after packaging; never reset TCC as a build step.
 
 Signing and actual Windows/Linux installation must be verified on their respective hosts before describing artifacts as release-tested.
+
+## GitHub Actions release pipeline
+
+Open **Actions → Release installers and VPS images → Run workflow** with `publish=false` (the default) to verify an exact checkout without signing secrets or publication. This produces unsigned macOS arm64 DMG/ZIP, Windows x64 NSIS EXE, per-platform `SHA256SUMS-*.txt`, public build provenance, and a Linux/amd64 image manifest. The image job also runs disposable service smoke tests. Workflow artifacts are retained for 14 days. A successful build does not establish native installation or account-login acceptance.
+
+The workflow has no pull-request trigger. Public publication requires the official `ShiftHackZ/ellmsha` repository, an exact `vYYYY.MM.DD-patch.N` tag, matching package/About metadata and release notes at `docs/releases/YYYY.MM.DD-patch.N.md`. The version's date must equal the publication day in **Europe/Kyiv**. Manual unsigned runs accept a candidate's earlier date; bump the metadata before tagging if publication moves to another day. Both preflight and the final publication job check the date, root SHA and every recursive gitlink. Changed fork revisions must already be available from their public remotes.
+
+Configure a GitHub **release** environment (with any desired human protection rules) and these secrets before a public run:
+
+| Secret | Value |
+| --- | --- |
+| `MAC_CERTIFICATE_P12_BASE64` | Base64 of a Developer ID Application certificate exported with its private key |
+| `MAC_CERTIFICATE_PASSWORD` | Password protecting that P12 export |
+| `MAC_SIGNING_IDENTITY` | Exact `Developer ID Application: …` identity |
+| `MAC_TEAM_ID` | Ten-character Apple team ID |
+| `MAC_NOTARY_APPLE_ID` | Apple account used by notarization |
+| `MAC_NOTARY_APP_PASSWORD` | Its app-specific password |
+
+Apple Development certificates are sufficient for local development signing, but this CI public-release path rejects them. The job imports the P12 into a temporary runner keychain and stores notarization credentials there. Only a public signing selector is exported to the build; certificate bytes are removed after import. An `always()` cleanup restores the original keychain search list and removes temporary signing files. These files are outside the checkout, caches and uploaded artifact paths. The build verifies the main app/helper signatures; CI additionally validates the stapled ticket and Gatekeeper assessment before accepting macOS artifacts.
+
+Windows signing is optional and reported separately in its build metadata. To require Authenticode on public Windows builds, set environment variable `WINDOWS_SIGNING_ENABLED=true` and secrets `WINDOWS_CERTIFICATE_P12_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD`. The build then fails if signing is unavailable, and CI verifies the installer and unpacked executable. Without that opt-in Windows artifacts are explicitly marked unsigned.
+
+Desktop jobs must both succeed before candidate images are pushed to GHCR. The reusable [Docker workflow](../../.github/workflows/docker-images.yml) publishes immutable version/source tags and an `images.json` digest manifest; it never promotes `latest`. The final job verifies installer hashes and all image identities against the same root SHA, stages a GitHub draft, then publishes it. An interrupted draft can be resumed only for the same tag and exact source; an already published release is never overwritten. Publication and image promotion are serialized across tags, and a release older than the current stable `latest` is rejected. Only after publication are the manifest's exact image digests promoted to `latest`. A failed later stage can leave candidate image tags or an unpublished draft for inspection; neither is silently deleted.
+
+Caches contain dependency downloads and Rust output only. Builds use native hosts and locked dependencies, and action versions are pinned to verified upstream commit SHAs. Public assets are an explicit allowlist of full installers, checksums and provenance. In-app updates download/open the full installer; this workflow does not produce Squirrel packages, delta packages or update YAML.
+
+Validation commands (no build or publication):
+
+```sh
+node --test scripts/release/*.test.mjs scripts/run-build-command.test.js docker/release-images.test.mjs
+actionlint .github/workflows/release.yml .github/workflows/docker-images.yml
+```
+
+References: [GitHub macOS certificate handling](https://docs.github.com/en/actions/how-tos/deploy/deploy-to-third-party-platforms/sign-xcode-applications), [runner labels](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), [macOS arm64 image toolchains](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-arm64-Readme.md), and [GHCR authentication/visibility](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry). New GHCR packages may initially be private; confirm each package's public visibility before advertising anonymous VPS pulls.
 
 The artifact verifier requires **every** expected format for the current version and host architecture, then writes a SHA-256 manifest beside the packages. This catches a missing Flatpak even if the DEB build succeeds. Checksums verify downloaded bytes; they do not replace signing or installation tests. CI also probes the real npm launcher on each host before building, including Windows' `npm.cmd` entry point through Node.
 

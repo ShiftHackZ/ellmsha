@@ -1,5 +1,7 @@
 # Build the checked-out forks so Docker and desktop contain the same changes.
-FROM node:22-bookworm-slim AS chrome-devtools-mcp
+FROM node:22.20.0-bookworm-slim AS node-base
+
+FROM node-base AS chrome-devtools-mcp
 WORKDIR /src/chrome-devtools-mcp
 COPY scripts/prepare-chrome-devtools-mcp.js /tmp/prepare-chrome-devtools-mcp.js
 COPY scripts/run-build-command.js /tmp/run-build-command.js
@@ -19,9 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends cmake pkg-confi
 WORKDIR /src/aioncore
 COPY aioncore/ ./
 COPY aionrs/ /src/aionrs/
+ENV CARGO_BUILD_JOBS=2
 RUN cargo build --locked --release -p aionui-app --bin aioncore
 
-FROM node:22-bookworm-slim AS frontend
+FROM node:22.20.0-bookworm-slim AS frontend
 ENV NODE_OPTIONS=--max-old-space-size=4096
 RUN npm install -g bun@1.3.9
 WORKDIR /src/aionui
@@ -37,7 +40,7 @@ RUN bun run package \
     && node scripts/build-mcp-servers.js \
     && bun build --compile --outfile=/src/aionui-web packages/web-cli/src/index.ts
 
-FROM node:22-bookworm-slim AS mobile-mcp
+FROM node:22.20.0-bookworm-slim AS mobile-mcp
 WORKDIR /src/mobile-mcp
 COPY scripts/prepare-mobile-mcp.js /tmp/prepare-mobile-mcp.js
 COPY scripts/run-build-command.js /tmp/run-build-command.js
@@ -47,22 +50,27 @@ RUN node -e "const {hashBuildInputs}=require('/tmp/prepare-mobile-mcp.js');if(ha
     && npm run build \
     && npm prune --omit=dev
 
-FROM golang:1.22-bookworm AS open-computer-use
+FROM golang:1.22.12-bookworm AS open-computer-use
 ARG TARGETARCH
+COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
 WORKDIR /src/open-computer-use
-COPY open-codex-computer-use/apps/OpenComputerUseLinux/ ./
-COPY open-codex-computer-use/LICENSE ./LICENSE
+COPY scripts/prepare-open-computer-use.js /tmp/prepare-open-computer-use.js
+COPY scripts/run-build-command.js /tmp/run-build-command.js
+COPY open-codex-computer-use/ ./
+RUN node -e "const p=require('/tmp/prepare-open-computer-use.js');if(p.hashBuildInputs(process.cwd())!==p.OPEN_COMPUTER_USE_SOURCE_DIGEST)throw Error('OCU source pin mismatch')"
+WORKDIR /src/open-computer-use/apps/OpenComputerUseLinux
 RUN case "$TARGETARCH" in amd64|arm64) ;; *) echo "Unsupported Open Computer Use architecture: $TARGETARCH" >&2; exit 1 ;; esac \
     && mkdir -p /runtime \
-    && CGO_ENABLED=0 GOOS=linux GOARCH="$TARGETARCH" go build -trimpath -ldflags '-s -w -X main.version=0.3.6' -o /runtime/open-computer-use . \
-    && cp LICENSE /runtime/LICENSE \
-    && printf '%s\n' "{\"commit\":\"83a521e546102564efd002f61a6763912081e5c7\",\"version\":\"0.3.6\",\"platform\":\"linux\",\"arch\":\"$([ \"$TARGETARCH\" = amd64 ] && echo x64 || echo arm64)\"}" > /runtime/.ellmsha-open-computer-use-pin.json \
+    && CGO_ENABLED=0 GOOS=linux GOARCH="$TARGETARCH" go build -mod=readonly -trimpath -ldflags '-s -w -X main.version=0.3.6' -o /runtime/open-computer-use . \
+    && cp ../../LICENSE /runtime/LICENSE \
+    && TARGETARCH="$TARGETARCH" node -e "const fs=require('fs'),p=require('/tmp/prepare-open-computer-use.js');fs.writeFileSync('/runtime/'+p.OPEN_COMPUTER_USE_MARKER,JSON.stringify({commit:p.OPEN_COMPUTER_USE_COMMIT,upstreamCommit:p.OPEN_COMPUTER_USE_UPSTREAM_COMMIT,sourceDigest:p.OPEN_COMPUTER_USE_SOURCE_DIGEST,version:p.OPEN_COMPUTER_USE_VERSION,platform:'linux',arch:process.env.TARGETARCH==='amd64'?'x64':'arm64'}))" \
     && /runtime/open-computer-use --version | grep -Fx '0.3.6'
 
-FROM node:22-bookworm-slim
+FROM node:22.20.0-bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libicu-dev python3 python3-gi gir1.2-atspi-2.0 gir1.2-gtk-3.0 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/ellmsha
+COPY LICENSE /usr/share/licenses/ellmsha/LICENSE
 COPY --from=backend /src/aioncore/target/release/aioncore ./aioncore
 COPY --from=frontend /src/aionui-web ./aionui-web
 COPY --from=frontend /src/aionui/out/renderer ./static

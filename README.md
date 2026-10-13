@@ -55,9 +55,9 @@ Installed macOS test profile after rebuilding its fixture with a 768-dimensional
 
 ## Start with the desktop
 
-The latest release is **[v2026.10.11 Patch 5](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.11-patch.5)**, with scoped memory retrieval and on-demand code graph controls. macOS packages are ad-hoc signed; Developer ID signing and notarization are not yet provided.
+Download installers and read their changelog from the **[latest published release](https://github.com/ShiftHackZ/ellmsha/releases/latest)**. Each release states its available platforms and signing status; a source commit or tag alone is not an installer release.
 
-1. [Download the Apple Silicon DMG](https://github.com/ShiftHackZ/ellmsha/releases/download/v2026.10.11-patch.5/eLLMsha-2026.10.11-patch.5-mac-arm64.dmg), or build from source using the [desktop build guide](scripts/release/README.md).
+1. Download the installer for your platform from the release page, or build from source using the [desktop build guide](scripts/release/README.md).
 2. Open a project folder, then attach any additional codebases from the Files panel.
 3. Choose an agent/model. For local inference, configure Ollama and install the models you need.
 4. Open **Settings → Memory** to configure the embedding model; open **Plugins** to connect integrations.
@@ -100,7 +100,7 @@ About shows upstream and patch provenance for the current build. Core integratio
 
 ## Project status
 
-macOS arm64 packaging, installed launch and same-version chat/memory persistence have been exercised. Windows EXE and Linux DEB/Flatpak targets are configured; their builds and VM checks are deferred for this milestone. macOS Developer ID signing/notarization and cross-version migrations remain unverified. Some integration checks require your account or OS permissions.
+macOS arm64 packaging, installed launch and chat/memory persistence have been exercised. Release automation targets macOS DMG/ZIP, Windows x64 EXE and Linux VPS container images. Current build, signing and runtime evidence is recorded per release; configured targets are not proof of successful builds or installation tests. Some integration checks require your account or OS permissions.
 
 See [the evidence and remaining release checks](docs/release-status.md) before deploying.
 
