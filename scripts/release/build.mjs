@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkFlatpak } from './flatpak-preflight.mjs';
-import { macSigning } from './mac-signing.mjs';
+import { electronBuilderIdentity, macSigning } from './mac-signing.mjs';
 import { checkBuildPrerequisites } from './build-prerequisites.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -37,6 +37,8 @@ const env = {
 };
 delete env.ELLM_SHA_SIGNING_REQUIRED;
 delete env.ELLM_SHA_SIGNING_TEAM;
+delete env.ELLM_SHA_SIGNING_IDENTITY;
+delete env.ELLM_SHA_NOTARIZATION_REQUIRED;
 // rust-lang/rust#157750: stripped proc-macro dylibs cannot load on macOS 27.
 if (process.platform === 'darwin') env.CARGO_PROFILE_RELEASE_STRIP = 'none';
 if (!signed) {
@@ -48,7 +50,8 @@ if (signing) {
   // This host selected an existing Keychain identity, not an imported p12.
   delete env.CSC_LINK;
   delete env.CSC_KEY_PASSWORD;
-  env.CSC_NAME = signing.identity;
+  env.CSC_NAME = electronBuilderIdentity(signing.identity);
+  env.ELLM_SHA_SIGNING_IDENTITY = signing.identity;
   env.ELLM_SHA_SIGNING_TEAM = signing.teamIdentifier;
   env.ELLM_SHA_SIGNING_REQUIRED = '1';
   // Xcode-managed Apple Development is for local installations. Public notarized
@@ -59,6 +62,7 @@ if (signing) {
     // keychain profile. Honor the explicit host configuration deterministically.
     for (const key of ['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_API_KEY', 'APPLE_API_KEY_ID', 'APPLE_API_ISSUER']) delete env[key];
     env.APPLE_KEYCHAIN_PROFILE = signing.notaryProfile;
+    env.ELLM_SHA_NOTARIZATION_REQUIRED = '1';
   }
   else signingArgs.push('--config.mac.notarize=false');
 }
