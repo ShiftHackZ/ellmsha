@@ -24,6 +24,30 @@ export function validateManifest(manifest, published = false) {
   }
   if (published && manifest.published !== true) throw Error('Images were not published');
 }
+function validateHandoffManifest(manifest) {
+  validateManifest(manifest);
+  if (manifest.published !== false || manifest.images.some(image => image.digest !== null || !/^sha256:[a-f0-9]{64}$/.test(image.localImageId))) throw Error('Expected unpublished images with exact local image IDs');
+}
+export function validateLocalImages(manifest) {
+  validateHandoffManifest(manifest);
+  for (const image of manifest.images) {
+    const info = JSON.parse(run('docker', ['image', 'inspect', image.localImageId]))[0];
+    const labels = info?.Config?.Labels;
+    if (info?.Id !== image.localImageId || info.Os !== 'linux' || info.Architecture !== 'amd64'
+      || labels?.['org.opencontainers.image.source'] !== 'https://github.com/ShiftHackZ/ellmsha'
+      || labels?.['org.opencontainers.image.revision'] !== manifest.sourceRevision
+      || labels?.['org.opencontainers.image.version'] !== manifest.version) throw Error(`Image handoff identity mismatch: ${image.service}`);
+  }
+}
+export function saveImages(manifest, destination) {
+  validateLocalImages(manifest);
+  run('docker', ['save', '--output', destination, ...manifest.images.map(image => image.localImageId)]);
+}
+export function loadImages(manifest, source) {
+  validateHandoffManifest(manifest);
+  run('docker', ['load', '--input', source]);
+  validateLocalImages(manifest);
+}
 export function forbiddenContextPath(file) {
   // Public OCU catalog metadata is part of its exact source pin. No sibling
   // agent configuration or skill is included by these directory exceptions.
@@ -92,6 +116,12 @@ export function prepareContext(destination, version, revision) {
 function main() {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'prepare-context') return prepareContext(...args);
+  if (command === 'save' || command === 'load') {
+    const [file, archivePath] = args;
+    if (!file || !archivePath) throw Error('Expected image manifest and Docker archive paths');
+    const manifest = JSON.parse(fs.readFileSync(file));
+    return command === 'save' ? saveImages(manifest, archivePath) : loadImages(manifest, archivePath);
+  }
   if (command === 'manifest') {
     const [file, version, revision] = args;
     const manifest = imagePlan(version, revision);
@@ -160,7 +190,7 @@ function main() {
     fs.writeFileSync(file, JSON.stringify(manifest, null, 2) + '\n');
     return;
   }
-  throw Error('Usage: release-images.mjs prepare-context DIR VERSION SHA | manifest FILE VERSION SHA | publish FILE');
+  throw Error('Usage: release-images.mjs prepare-context DIR VERSION SHA | manifest FILE VERSION SHA | save FILE TAR | load FILE TAR | publish FILE');
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { main(); } catch (error) { console.error(error.message); process.exitCode = 1; }

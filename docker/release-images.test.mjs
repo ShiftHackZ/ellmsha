@@ -44,6 +44,76 @@ test('release manifest binds four amd64 images to exact source/version, never la
   m.images[1].image = 'ghcr.io/elsewhere/private';
   assert.throws(() => validateManifest(m, true));
 });
+test('image handoff saves tested IDs and validates loaded bytes before publication', (t) => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'ellmsha-image-handoff-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const manifest = imagePlan('2026.10.14-patch.10', 'a'.repeat(40));
+  manifest.images.forEach((image, index) => image.localImageId = `sha256:${String(index).repeat(64)}`);
+  const images = Object.fromEntries(manifest.images.map(image => [image.localImageId, { Id: image.localImageId, Os: 'linux', Architecture: 'amd64', Config: { Labels: {
+    'org.opencontainers.image.source': 'https://github.com/ShiftHackZ/ellmsha',
+    'org.opencontainers.image.revision': manifest.sourceRevision,
+    'org.opencontainers.image.version': manifest.version,
+  } } }]));
+  const statePath = path.join(dir, 'state.json');
+  const manifestPath = path.join(dir, 'images.json');
+  const tar = path.join(dir, 'images with spaces.tar');
+  const saveState = state => fs.writeFileSync(statePath, JSON.stringify(state));
+  const readState = () => JSON.parse(fs.readFileSync(statePath));
+  const manifestBytes = JSON.stringify(manifest);
+  fs.writeFileSync(manifestPath, manifestBytes);
+  fs.writeFileSync(path.join(dir, 'docker'), `#!/usr/bin/env node
+const fs=require('fs'),file=process.env.HANDOFF_STATE,s=JSON.parse(fs.readFileSync(file)),a=process.argv.slice(2);s.calls.push(a);let out='',error='';
+if(a.slice(0,2).join(' ')==='image inspect'){if(s.images[a[2]])out=JSON.stringify([s.images[a[2]]]);else error='No such image';}
+else if(a[0]==='save'){if(a[1]!=='--output')throw Error('Bad save arguments');fs.writeFileSync(a[2],JSON.stringify(Object.fromEntries(a.slice(3).map(id=>[id,s.images[id]]))));}
+else if(a[0]==='load'){if(a[1]!=='--input')throw Error('Bad load arguments');s.images=JSON.parse(fs.readFileSync(a[2]));}
+else error='Unexpected Docker operation';
+fs.writeFileSync(file,JSON.stringify(s));if(error){console.error(error);process.exit(1)}console.log(out);
+`, { mode: 0o755 });
+  const execute = command => {
+    try {
+      execFileSync(process.execPath, [new URL('./release-images.mjs', import.meta.url).pathname, command, manifestPath, tar], { env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, HANDOFF_STATE: statePath }, stdio: ['ignore', 'pipe', 'pipe'] });
+      return null;
+    } catch (error) { return error.stderr.toString(); }
+  };
+  saveState({ images, calls: [] });
+  assert.equal(execute('save'), null);
+  assert.deepEqual(readState().calls.at(-1), ['save', '--output', tar, ...manifest.images.map(image => image.localImageId)]);
+  const archiveBytes = fs.readFileSync(tar);
+  saveState({ images: {}, calls: [] });
+  assert.equal(execute('load'), null);
+  assert.deepEqual(readState().calls[0], ['load', '--input', tar]);
+  assert.equal(readState().calls.filter(call => call[0] === 'image').length, 4);
+  assert.equal(fs.readFileSync(manifestPath, 'utf8'), manifestBytes);
+  for (const mutation of [
+    image => delete image.Id,
+    image => image.Id = 'sha256:' + 'f'.repeat(64),
+    image => image.Os = 'windows',
+    image => image.Architecture = 'arm64',
+    image => image.Config.Labels['org.opencontainers.image.source'] = 'https://github.com/elsewhere/other',
+    image => image.Config.Labels['org.opencontainers.image.revision'] = 'b'.repeat(40),
+    image => image.Config.Labels['org.opencontainers.image.version'] = '2026.10.13-patch.9',
+  ]) {
+    const changed = structuredClone(images);
+    mutation(changed[manifest.images[0].localImageId]);
+    saveState({ images: changed, calls: [] });
+    assert.match(execute('save'), /Image handoff identity mismatch/);
+    assert.ok(readState().calls.every(call => call[0] === 'image'));
+    fs.writeFileSync(tar, JSON.stringify(changed));
+    saveState({ images: {}, calls: [] });
+    assert.match(execute('load'), /Image handoff identity mismatch/);
+  }
+  fs.writeFileSync(tar, '{}');
+  saveState({ images: {}, calls: [] });
+  assert.match(execute('load'), /No such image/);
+  fs.writeFileSync(tar, archiveBytes);
+  for (const mutation of [m => delete m.images[0].localImageId, m => m.images[0].localImageId = 'latest', m => m.published = true]) {
+    const changed = structuredClone(manifest); mutation(changed);
+    fs.writeFileSync(manifestPath, JSON.stringify(changed));
+    saveState({ images, calls: [] });
+    assert.match(execute('load'), /Expected unpublished images/);
+    assert.deepEqual(readState().calls, []);
+  }
+});
 test('private/untracked runtime material is barred from archive context', () => {
   for (const p of ['.data/account.json', 'aionui/.env', 'nested/.env.production', 'config/auth.json', 'signing/certificate.p12', 'nested/id.key', '.aws/config', 'workspaces/customer/README.md', 'nested/memory.sqlite', 'aioncore/.opencode/skills/cron', 'aionui/.aionrs/skills/cron', 'nested/.agents/skills/local']) assert.equal(forbiddenContextPath(p), true, p);
   for (const p of ['aioncore/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/MemoryCore.json', 'docker/memory.Dockerfile']) assert.equal(forbiddenContextPath(p), false, p);

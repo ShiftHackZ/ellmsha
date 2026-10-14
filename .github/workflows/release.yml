@@ -5,8 +5,16 @@ on:
     tags: ['v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-patch.*']
   workflow_dispatch:
     inputs:
+      desktop:
+        description: 'Build signed/notarized macOS and unsigned Windows installers.'
+        type: boolean
+        default: true
+      docker:
+        description: 'Build and smoke-test all Linux VPS images.'
+        type: boolean
+        default: true
       publish:
-        description: 'Publish GitHub release and GHCR images from the matching release tag. Always requires signed/notarized macOS artifacts.'
+        description: 'Publish from the matching release tag. Requires desktop=true and docker=true.'
         type: boolean
         default: false
 
@@ -26,6 +34,8 @@ jobs:
       tag: ${{ steps.source.outputs.tag }}
       source_ref: ${{ steps.source.outputs.source_ref }}
       publish: ${{ steps.source.outputs.publish }}
+      desktop: ${{ steps.source.outputs.desktop }}
+      docker: ${{ steps.source.outputs.docker }}
     steps:
       - name: Preserve source bytes
         run: git config --global core.autocrlf false
@@ -43,6 +53,8 @@ jobs:
         id: source
         env:
           RELEASE_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+          RELEASE_BUILD_DESKTOP: ${{ github.event_name == 'push' || inputs.desktop }}
+          RELEASE_BUILD_DOCKER: ${{ github.event_name == 'push' || inputs.docker }}
           REQUIRE_SIGNING_SECRETS: 'true'
           MAC_SIGNING_READY: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' && secrets.MAC_SIGNING_IDENTITY != '' && secrets.MAC_TEAM_ID != '' && secrets.MAC_NOTARY_APPLE_ID != '' && secrets.MAC_NOTARY_APP_PASSWORD != '' }}
         run: node scripts/release/ci-preflight.mjs
@@ -54,6 +66,7 @@ jobs:
 
   desktop:
     needs: preflight
+    if: needs.preflight.outputs.desktop == 'true'
     name: ${{ matrix.target }} (${{ matrix.signing }}; ${{ needs.preflight.outputs.publish == 'true' && 'release' || 'verification' }})
     environment: ${{ matrix.environment }}
     strategy:
@@ -83,6 +96,8 @@ jobs:
       ELLM_SHA_CARGO_HOME: ${{ github.workspace }}/.data/cargo
       RELEASE_SOURCE_REF: ${{ needs.preflight.outputs.source_ref }}
       RELEASE_PUBLISH: ${{ needs.preflight.outputs.publish }}
+      RELEASE_BUILD_DESKTOP: ${{ needs.preflight.outputs.desktop }}
+      RELEASE_BUILD_DOCKER: ${{ needs.preflight.outputs.docker }}
       RELEASE_TARGET: ${{ matrix.target }}
     steps:
       - name: Preserve source bytes
@@ -191,11 +206,11 @@ jobs:
         run: node scripts/release/ci-macos-signing.mjs cleanup
 
   images:
-    needs: [preflight, desktop]
+    needs: preflight
+    if: needs.preflight.outputs.docker == 'true'
     uses: ./.github/workflows/docker-images.yml
     permissions:
       contents: read
-      packages: write
     with:
       version: ${{ needs.preflight.outputs.version }}
       source_ref: ${{ needs.preflight.outputs.source_ref }}
@@ -203,7 +218,7 @@ jobs:
 
   publish:
     needs: [preflight, desktop, images]
-    if: needs.preflight.outputs.publish == 'true'
+    if: needs.preflight.outputs.publish == 'true' && needs.desktop.result == 'success' && needs.images.result == 'success'
     runs-on: ubuntu-24.04
     environment: release
     concurrency:
@@ -241,22 +256,31 @@ jobs:
         with:
           name: ${{ needs.images.outputs.image_manifest_artifact_name }}
           path: ${{ runner.temp }}/release-assets
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.images.outputs.image_archive_artifact_name }}
+          path: ${{ runner.temp }}/release-images
       - name: Recheck publication date, provenance and downloaded installer hashes
         run: |
           node scripts/release/ci-preflight.mjs
           node scripts/release/ci-artifacts.mjs verify
-      - name: Publish complete root release
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ShiftHackZ/ellmsha
-        run: node scripts/release/ci-publish.mjs
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Restore verified images and publish immutable candidates
+        run: |
+          node docker/release-images.mjs load "$RELEASE_STAGE_DIR/images.json" "$RUNNER_TEMP/release-images/images.tar"
+          node docker/release-images.mjs validate "$RELEASE_STAGE_DIR/images.json" "$RELEASE_VERSION" "$RELEASE_SOURCE_REF"
+          node docker/release-images.mjs publish "$RELEASE_STAGE_DIR/images.json"
+      - name: Publish complete root release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ShiftHackZ/ellmsha
+        run: node scripts/release/ci-publish.mjs
       - name: Promote verified image digests after release publication
         env:
           GH_TOKEN: ${{ github.token }}

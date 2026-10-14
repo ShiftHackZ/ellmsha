@@ -17,25 +17,35 @@ test('manual verification accepts candidate dates but never PR events', () => {
   for (const version of ['2026.02.30-patch.1', '2026.13.01-patch.1', '2026.10.13-patch.0', '2026.10.13-patch.1;echo x']) assert.throws(() => validateRelease({ ...input, version }));
 });
 test('all runs sign macOS while only publication requires the release tag and date', () => {
-  assert.deepEqual(resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch' }), { publish: false, signMacos: true });
+  assert.deepEqual(resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch' }), { publish: false, signMacos: true, desktop: true, docker: true });
   for (const event of ['workflow_dispatch', 'push']) {
     for (const publish of [false, true]) {
       const mode = resolveReleaseMode({ GITHUB_EVENT_NAME: event, RELEASE_PUBLISH: String(publish) });
-      assert.deepEqual(mode, { publish: event === 'push' || publish, signMacos: true });
+      assert.deepEqual(mode, { publish: event === 'push' || publish, signMacos: true, desktop: true, docker: true });
     }
   }
   const mode = resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch', RELEASE_PUBLISH: 'false' });
   assert.equal(validateRelease({ ...input, ...mode, event: 'workflow_dispatch', ref: 'refs/heads/main', now: new Date('2026-11-02T12:00:00Z') }).publish, false);
 });
-test('every preflight fails early without all six secrets, including non-publishing runs', () => {
+test('desktop preflight fails early without all six secrets, including non-publishing runs', () => {
   const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', RELEASE_PUBLISH: 'false', REQUIRE_SIGNING_SECRETS: 'true' };
   assert.throws(() => resolveReleaseMode(env), (error) => MAC_SIGNING_SECRETS.every((name) => error.message.includes(name)));
-  assert.deepEqual(resolveReleaseMode({ ...env, MAC_SIGNING_READY: 'true' }), { publish: false, signMacos: true });
+  assert.deepEqual(resolveReleaseMode({ ...env, MAC_SIGNING_READY: 'true' }), { publish: false, signMacos: true, desktop: true, docker: true });
   assert.throws(() => resolveReleaseMode({ ...env, RELEASE_SIGN_MACOS: 'false' }), /requires Developer ID/);
   assert.throws(() => resolveReleaseMode({ ...env, RELEASE_PUBLISH: 'true' }), /requires Developer ID/);
   assert.throws(() => resolveReleaseMode({ ...env, GITHUB_EVENT_NAME: 'push' }), /requires Developer ID/);
   assert.throws(() => resolveReleaseMode({ ...env, MAC_SIGNING_READY: 'false' }), /requires Developer ID/);
   assert.throws(() => resolveReleaseMode({ ...env, GITHUB_EVENT_NAME: 'pull_request', MAC_SIGNING_READY: 'true' }), /only tag push/);
+});
+test('independent verification selections skip only the requested builds; publication needs both', () => {
+  for (const desktop of [false, true]) for (const docker of [false, true]) for (const publish of [false, true]) {
+    const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', RELEASE_PUBLISH: String(publish), RELEASE_BUILD_DESKTOP: String(desktop), RELEASE_BUILD_DOCKER: String(docker), REQUIRE_SIGNING_SECRETS: 'true', MAC_SIGNING_READY: String(desktop) };
+    if (!desktop && !docker) assert.throws(() => resolveReleaseMode(env), /at least one build/);
+    else if (publish && (!desktop || !docker)) assert.throws(() => resolveReleaseMode(env), /requires both/);
+    else assert.deepEqual(resolveReleaseMode(env), { publish, signMacos: true, desktop, docker });
+  }
+  assert.deepEqual(resolveReleaseMode({ GITHUB_EVENT_NAME: 'push', RELEASE_BUILD_DESKTOP: 'false', RELEASE_BUILD_DOCKER: 'false' }), { publish: true, signMacos: true, desktop: true, docker: true });
+  for (const key of ['RELEASE_BUILD_DESKTOP', 'RELEASE_BUILD_DOCKER']) assert.throws(() => resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch', [key]: 'invalid' }), /true or false/);
 });
 test('source provenance rejects missing, moved, conflicted or modified gitlinks', () => {
   const sha = 'a'.repeat(40);

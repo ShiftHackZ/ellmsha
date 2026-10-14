@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const workflow = readFileSync(new URL('../../.github/workflows/release.yml', import.meta.url), 'utf8');
+const imageWorkflow = readFileSync(new URL('../../.github/workflows/docker-images.yml', import.meta.url), 'utf8');
 test('release credentials and publication are unavailable to pull-request workflows', () => {
   assert.doesNotMatch(workflow, /pull_request|workflow_run|secrets:\s*inherit/);
   assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?default: false/);
@@ -53,4 +54,27 @@ test('failed packaging retains the same non-secret cache paths without saving ca
   assert.doesNotMatch(paths(save), /signing|keychain|\.p12|source-manifest|release-installers/);
   assert.match(save, /key: \$\{\{ steps\.desktop-cache\.outputs\.cache-primary-key \}\}/);
   assert.match(workflow, /Retain build cache after packaging failure\n\s+if: \$\{\{ !cancelled\(\) && steps\.desktop-cache\.outputs\.cache-primary-key != '' && steps\.desktop-cache\.outputs\.cache-hit != 'true' \}\}/);
+});
+
+test('desktop and docker verification run independently after preflight with explicit default-on flags', () => {
+  for (const flag of ['desktop', 'docker']) {
+    assert.match(workflow, new RegExp(`      ${flag}:\\n        description: [^\\n]+\\n        type: boolean\\n        default: true`));
+    assert.ok(workflow.includes(`RELEASE_BUILD_${flag.toUpperCase()}: \${{ github.event_name == 'push' || inputs.${flag} }}`));
+    assert.ok(workflow.includes(`${flag}: \${{ steps.source.outputs.${flag} }}`));
+  }
+  assert.match(workflow, /desktop:\n    needs: preflight\n    if: needs\.preflight\.outputs\.desktop == 'true'/);
+  assert.match(workflow, /images:\n    needs: preflight\n    if: needs\.preflight\.outputs\.docker == 'true'/);
+  assert.match(workflow, /publish:\n    needs: \[preflight, desktop, images\]\n    if: needs\.preflight\.outputs\.publish == 'true'/);
+});
+
+test('parallel image builds cannot publish; tested bytes transfer only for gated full publication', () => {
+  assert.match(workflow, /if: needs\.preflight\.outputs\.publish == 'true' && needs\.desktop\.result == 'success' && needs\.images\.result == 'success'/);
+  assert.doesNotMatch(imageWorkflow, /packages: write|docker\/login-action|release-images\.mjs publish|push: true|secrets\./);
+  assert.match(imageWorkflow, /Save tested images for gated publication\n        if: inputs\.publish\n        run: node docker\/release-images\.mjs save/);
+  assert.match(imageWorkflow, /if: inputs\.publish\n        with:\n          name: \$\{\{ steps.identity.outputs.archive_artifact \}\}/);
+  const publish = workflow.split('\n  publish:\n')[1];
+  assert.match(publish, /name: \$\{\{ needs.images.outputs.image_archive_artifact_name \}\}\n          path: \$\{\{ runner.temp \}\}\/release-images/);
+  const order = ['node scripts/release/ci-preflight.mjs', 'node scripts/release/ci-artifacts.mjs verify', 'node docker/release-images.mjs load', 'node docker/release-images.mjs validate', 'node docker/release-images.mjs publish', 'node scripts/release/ci-publish.mjs', 'node docker/promote-images.mjs'];
+  let previous = -1;
+  for (const command of order) { const current = publish.indexOf(command); assert.ok(current > previous, `${command} must follow its prerequisite`); previous = current; }
 });
