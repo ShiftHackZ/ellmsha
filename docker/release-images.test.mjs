@@ -58,6 +58,31 @@ test('retained broken, escaping and private-input links fail closed', (t) => {
     assert.equal(fs.existsSync(path.join(context, '.env')), false);
   }
 });
+test('only pinned OCU public catalog metadata survives the ambient-agent exclusions', (t) => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'ellmsha-public-ocu-catalog-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const context = path.join(dir, 'context');
+  const agentPath = 'open-codex-computer-use/.agents';
+  const catalog = `${agentPath}/plugins/marketplace.json`;
+  fs.mkdirSync(path.join(context, agentPath, 'plugins'), { recursive: true });
+  fs.writeFileSync(path.join(context, catalog), '{"name":"public-pinned-fixture"}\n');
+  const privatePaths = [`${agentPath}/plugins/other.json`, `${agentPath}/skills/cron`, 'other-fork/.agents/plugins/marketplace.json'];
+  for (const file of privatePaths) {
+    assert.equal(forbiddenContextPath(file), true, file);
+    fs.mkdirSync(path.dirname(path.join(context, file)), { recursive: true });
+    fs.symlinkSync(path.join(dir, 'missing-private-target'), path.join(context, file));
+  }
+  assert.equal(forbiddenContextPath(catalog), false);
+  cleanContext(context);
+  assert.equal(fs.readFileSync(path.join(context, catalog), 'utf8'), '{"name":"public-pinned-fixture"}\n');
+  for (const file of privatePaths) assert.equal(fs.existsSync(path.join(context, file)), false, file);
+  // A path exception never bypasses the retained-link containment check.
+  fs.rmSync(path.join(context, catalog));
+  fs.writeFileSync(path.join(dir, 'foreign'), 'untouched');
+  fs.symlinkSync(path.join(dir, 'foreign'), path.join(context, catalog));
+  assert.throws(() => cleanContext(context), /External build-context symlink/);
+  assert.equal(fs.readFileSync(path.join(dir, 'foreign'), 'utf8'), 'untouched');
+});
 test('memory image manifest matches the desktop release locks', () => {
   for (const name of ['MemoryCore', 'MemoryPanel', 'MemoryKnowledge']) {
     const p = JSON.parse(fs.readFileSync(new URL(`../tencentdb-agent-memory/${name}/package.json`, import.meta.url)));

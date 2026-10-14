@@ -12,6 +12,12 @@
 **/.opencode
 **/.aionrs
 **/.agents
+# Retain only the public metadata covered by OCU's exact source digest.
+!open-codex-computer-use/.agents
+open-codex-computer-use/.agents/**
+!open-codex-computer-use/.agents/plugins
+open-codex-computer-use/.agents/plugins/**
+!open-codex-computer-use/.agents/plugins/marketplace.json
 **/.pnpm-store
 workspaces
 **/node_modules

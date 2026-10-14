@@ -25,6 +25,9 @@ export function validateManifest(manifest, published = false) {
   if (published && manifest.published !== true) throw Error('Images were not published');
 }
 export function forbiddenContextPath(file) {
+  // Public OCU catalog metadata is part of its exact source pin. No sibling
+  // agent configuration or skill is included by these directory exceptions.
+  if (['open-codex-computer-use/.agents', 'open-codex-computer-use/.agents/plugins', 'open-codex-computer-use/.agents/plugins/marketplace.json'].includes(file)) return false;
   return /(^|\/)(?:\.git|\.data|\.aws|\.codex|\.claude|\.opencode|\.aionrs|\.agents|node_modules|workspaces)(\/|$)/.test(file)
     || /(^|\/)(?:\.env(?:\..*)?|\.npmrc|auth\.json|credentials\.json)$/.test(file)
     || /\.(?:p12|pfx|key|pem|mobileprovision|provisionprofile|sqlite3?|db)$/i.test(file);
