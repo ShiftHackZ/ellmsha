@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
-import { imagePlan, validateManifest, forbiddenContextPath } from './release-images.mjs';
+import path from 'node:path';
+import { tmpdir } from 'node:os';
+import { imagePlan, validateManifest, forbiddenContextPath, cleanContext } from './release-images.mjs';
 test('release manifest binds four amd64 images to exact source/version, never latest', () => {
   const m = imagePlan('2026.10.13-patch.10', 'a'.repeat(40));
   assert.equal(m.images.length, 4);
@@ -15,8 +17,46 @@ test('release manifest binds four amd64 images to exact source/version, never la
   assert.throws(() => validateManifest(m, true));
 });
 test('private/untracked runtime material is barred from archive context', () => {
-  for (const p of ['.data/account.json', 'aionui/.env', 'nested/.env.production', 'config/auth.json', 'signing/certificate.p12', 'nested/id.key', '.aws/config', 'workspaces/customer/README.md', 'nested/memory.sqlite']) assert.equal(forbiddenContextPath(p), true, p);
+  for (const p of ['.data/account.json', 'aionui/.env', 'nested/.env.production', 'config/auth.json', 'signing/certificate.p12', 'nested/id.key', '.aws/config', 'workspaces/customer/README.md', 'nested/memory.sqlite', 'aioncore/.opencode/skills/cron', 'aionui/.aionrs/skills/cron', 'nested/.agents/skills/local']) assert.equal(forbiddenContextPath(p), true, p);
   for (const p of ['aioncore/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/MemoryCore.json', 'docker/memory.Dockerfile']) assert.equal(forbiddenContextPath(p), false, p);
+});
+test('context removes ambient skill links without dereferencing or modifying foreign files', (t) => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'ellmsha-context-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const context = path.join(dir, 'context');
+  fs.mkdirSync(path.join(context, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'foreign-sentinel'), 'unchanged');
+  for (const name of ['.opencode', '.aionrs', '.agents']) {
+    fs.mkdirSync(path.join(context, name, 'skills'), { recursive: true });
+    fs.symlinkSync(path.join(dir, 'missing-developer-home', 'cron'), path.join(context, name, 'skills', 'cron'));
+    fs.symlinkSync(path.join(dir, 'foreign-sentinel'), path.join(context, name, 'skills', 'foreign'));
+  }
+  fs.writeFileSync(path.join(context, 'src', 'build-input'), 'tracked input');
+  fs.symlinkSync('src/build-input', path.join(context, 'input-link'));
+  fs.symlinkSync('src', path.join(context, 'source-link'));
+  assert.equal(cleanContext(context), 3);
+  for (const name of ['.opencode', '.aionrs', '.agents']) assert.equal(fs.existsSync(path.join(context, name)), false);
+  assert.equal(fs.readFileSync(path.join(dir, 'foreign-sentinel'), 'utf8'), 'unchanged');
+  assert.equal(fs.readFileSync(path.join(context, 'input-link'), 'utf8'), 'tracked input');
+  assert.equal(fs.readlinkSync(path.join(context, 'source-link')), 'src');
+});
+test('retained broken, escaping and private-input links fail closed', (t) => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'ellmsha-context-links-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'context-sibling'));
+  fs.writeFileSync(path.join(dir, 'context-sibling', 'outside'), 'foreign');
+  for (const [name, target, expected] of [
+    ['broken', 'missing', /Unresolvable build-context symlink/],
+    ['external', '../context-sibling/outside', /External build-context symlink/],
+    ['private-alias', '.env', /Unresolvable build-context symlink/],
+  ]) {
+    const context = path.join(dir, name === 'external' ? 'context' : name);
+    fs.mkdirSync(context);
+    fs.writeFileSync(path.join(context, '.env'), 'must be removed');
+    fs.symlinkSync(target, path.join(context, 'retained-link'));
+    assert.throws(() => cleanContext(context), expected);
+    assert.equal(fs.existsSync(path.join(context, '.env')), false);
+  }
 });
 test('memory image manifest matches the desktop release locks', () => {
   for (const name of ['MemoryCore', 'MemoryPanel', 'MemoryKnowledge']) {

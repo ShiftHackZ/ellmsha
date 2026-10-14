@@ -25,9 +25,32 @@ export function validateManifest(manifest, published = false) {
   if (published && manifest.published !== true) throw Error('Images were not published');
 }
 export function forbiddenContextPath(file) {
-  return /(^|\/)(?:\.git|\.data|\.aws|\.codex|\.claude|node_modules|workspaces)(\/|$)/.test(file)
+  return /(^|\/)(?:\.git|\.data|\.aws|\.codex|\.claude|\.opencode|\.aionrs|\.agents|node_modules|workspaces)(\/|$)/.test(file)
     || /(^|\/)(?:\.env(?:\..*)?|\.npmrc|auth\.json|credentials\.json)$/.test(file)
     || /\.(?:p12|pfx|key|pem|mobileprovision|provisionprofile|sqlite3?|db)$/i.test(file);
+}
+export function cleanContext(destination) {
+  destination = fs.realpathSync(destination);
+  let removed = 0;
+  const links = [];
+  function clean(folder, relative = '') {
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
+      const file = relative ? `${relative}/${entry.name}` : entry.name;
+      const absolute = path.join(folder, entry.name);
+      if (forbiddenContextPath(file)) { fs.rmSync(absolute, { recursive: true, force: true }); removed++; }
+      else if (entry.isSymbolicLink()) links.push({ file, absolute });
+      else if (entry.isDirectory()) clean(absolute, file);
+    }
+  }
+  clean(destination);
+  // Validate after all exclusions: an alias must not retain removed private inputs.
+  for (const { file, absolute } of links) {
+    let target;
+    try { target = fs.realpathSync(absolute); }
+    catch (cause) { throw Error(`Unresolvable build-context symlink: ${file}`, { cause }); }
+    if (!target.startsWith(destination + path.sep)) throw Error(`External build-context symlink: ${file}`);
+  }
+  return removed;
 }
 function archive(repository, destination) {
   const result = spawnSync('git', ['archive', '--format=tar', 'HEAD'], { cwd: repository, maxBuffer: 512 * 1024 * 1024 });
@@ -57,17 +80,7 @@ export function prepareContext(destination, version, revision) {
     pins[folder] = sha;
   }
   // Archive only tracked public inputs, then remove files forbidden even in a tracked tree.
-  let removed = 0;
-  function clean(folder, relative = '') {
-    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
-      const file = relative ? `${relative}/${entry.name}` : entry.name;
-      const absolute = path.join(folder, entry.name);
-      if (forbiddenContextPath(file)) { fs.rmSync(absolute, { recursive: true, force: true }); removed++; }
-      else if (entry.isSymbolicLink()) { const target = fs.realpathSync(absolute); if (!target.startsWith(destination + path.sep)) throw Error(`External build-context symlink: ${file}`); }
-      else if (entry.isDirectory()) clean(absolute, file);
-    }
-  }
-  clean(destination);
+  const removed = cleanContext(destination);
   fs.writeFileSync(path.join(destination, 'docker/source.json'), JSON.stringify({ version, revision, submodules: pins }, null, 2) + '\n');
   console.log(`Prepared tracked source context; ${removed} forbidden paths excluded`);
 }

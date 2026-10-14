@@ -9,6 +9,9 @@
 **/.aws
 **/.codex
 **/.claude
+**/.opencode
+**/.aionrs
+**/.agents
 **/.pnpm-store
 workspaces
 **/node_modules
