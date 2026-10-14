@@ -18,15 +18,17 @@ The build prepares the memory, Mobile MCP, Chrome DevTools and Computer Use runt
 
 ## Build and verify
 
-Run from the repository root:
+For a macOS Apple Silicon release candidate, configure the host identity below, then run from the repository root using the pinned toolchains:
 
 ```sh
-node scripts/release/build.mjs --plan
-node scripts/release/build.mjs
+node scripts/release/build.mjs --plan --signed
+node scripts/release/build.mjs --signed
+xcrun stapler validate aionui/out/mac-arm64/eLLMsha.app
+spctl --assess --type execute --verbose=2 aionui/out/mac-arm64/eLLMsha.app
 node scripts/release/verify-artifacts.mjs
 ```
 
-The build script never publishes. On macOS, an external host signing configuration opts this machine into signed builds by default; without it, the build is unsigned. It compiles the local Rust backend with the locked dependency graph, then invokes the existing desktop packager, including its bundled-resource checks. Artifacts go to `aionui/out`. The `Release installers and VPS images` workflow described below replaces the former desktop-packages workflow. Linux desktop packages remain available through the local build script; CI targets Linux VPS images instead.
+The build script never publishes. Use the same signed build, stapled-ticket validation and Gatekeeper commands as CI for macOS release acceptance; stop if any step fails. `verify-artifacts.mjs` checks installer presence and hashes, so it does not replace the signature, notarization or native runtime checks. On macOS, an external host signing configuration opts this machine into signed builds by default; without it, the build is unsigned. `--signed` requires that configuration. The script compiles the local Rust backend with the locked dependency graph, then invokes the existing desktop packager, including its bundled-resource checks. Artifacts go to `aionui/out`. Windows release builds use `--unsigned`. Linux desktop packages remain available through the local build script; CI targets Linux VPS images instead.
 
 | Build host | Artifacts |
 | --- | --- |
@@ -38,25 +40,36 @@ Use a native host for each OS and architecture. Cross-compilation is deliberatel
 
 ### macOS signing on the build host
 
-Keep the private key in the login Keychain managed by Xcode. Configure only its public selector in `~/.config/ellmsha/mac-signing.json` (mode 600), or select another file outside the checkout with `ELLM_SHA_MAC_SIGNING_CONFIG`:
+Use the same Developer ID Application certificate and private key as GitHub Actions, held in the local Keychain. After importing the protected P12 through a secure local workflow, compare its public leaf-certificate fingerprint with an accepted CI app. Configure only public selectors in `~/.config/ellmsha/mac-signing.json` (mode 600), or select another file outside the checkout with `ELLM_SHA_MAC_SIGNING_CONFIG`:
 
 ```json
 {
-  "identity": "Apple Development: Your Name (CERTIFICATE_ID)",
-  "teamIdentifier": "YOURTEAMID",
-  "type": "development"
+  "identity": "Developer ID Application: Dmytro Moroz (383EQFRA4A)",
+  "teamIdentifier": "383EQFRA4A",
+  "type": "distribution",
+  "notaryProfile": "ellmsha-local"
 }
 ```
 
-`node scripts/release/build.mjs` then signs by default on that host. `--signed` requires the external configuration; `--unsigned` is an explicit unsigned build. The signed build fails if signing fails or if the main app or Computer Use helper has an ad-hoc signature, unexpected team, or hash-only designated requirement. It never repairs a failed certificate signature by silently using ad-hoc signing.
+Create `ellmsha-local` credentials with `xcrun notarytool store-credentials ellmsha-local --apple-id "YOUR_APPLE_ID" --team-id 383EQFRA4A` in a secure local terminal, supplying the Apple account, team `383EQFRA4A` and app-specific password at its prompts. Do not put the password in chat, shell arguments/history, source files or logs. The local profile name may differ from CI's `ellmsha-ci`; the certificate, team and notarization policy must match. Missing credentials must be resolved before a release build, without falling back to an unsigned or non-notarized package. As of 2026-10-14, local notarization setup and acceptance remain pending; successful CI notarization does not establish local credential readiness.
+
+`node scripts/release/build.mjs` then signs by default on that host. The explicit `--signed` release command requires the external configuration; `--unsigned` is an explicit unsigned build. The signed build fails if signing fails or if the main app or Computer Use helper has an ad-hoc signature, unexpected team, or hash-only designated requirement. It never repairs a failed certificate signature by silently using ad-hoc signing.
 
 The external `identity` must be the full certificate common name beginning with `Apple Development:` or `Developer ID Application:`. Surrounding whitespace is trimmed; hashes and partial-name selectors are rejected before building. Only the electron-builder selector omits its forbidden `Developer ID Application:` prefix. Native signing resolves the full certificate name, and app/helper verification requires that exact authority and team. Prepackaged macOS recovery validates the signature first and, for notarized builds, the stapled ticket and Gatekeeper acceptance before repacking; an existing `.app` alone is not evidence of successful signing.
 
-An Xcode-managed Apple Development identity supports local installations. It is **not** a notarized public distribution identity. Public distribution requires a Developer ID Application identity (`type: "distribution"`) and, for notarization, an optional `notaryProfile` naming credentials already held in Keychain. Do not put account credentials, certificates, private keys, provisioning profiles or machine-specific configuration in this repository.
+The parser still supports Apple Development for development-only installations, but release candidates require Developer ID Application, `type: "distribution"` and a working `notaryProfile`. A signed development build does not satisfy this release policy. Do not put account credentials, certificates, private keys, provisioning profiles or machine-specific configuration in this repository.
+
+Local and CI builds share `build.mjs`, Electron Builder configuration, app/helper bundle identifiers, `entitlements.plist` and hardened runtime settings. Verify the exact certificate/team and designated requirements, emitted entitlements and hardened-runtime flags, stapled ticket and Gatekeeper result when comparing candidates. The existing signing hook checks the selected certificate/team and rejects hash-only designated requirements; it does not itself compare the full requirement or emitted entitlements with another build. Policy parity means those signing properties and exact source revisions match. Secure signing timestamps, notarization tickets and packaging can produce different bytes and hashes; byte-for-byte equality between local and CI builds is not promised.
 
 Keep bundle identifiers and the certificate-based designated requirements stable between updates. Moving from a previous ad-hoc build to certificate signing is an identity transition: macOS may require permission once again. Signing does not grant permissions or guarantee that an expired/changed certificate will retain consent. Verify the actual main app and helper after packaging; never reset TCC as a build step.
 
 Signing and actual Windows/Linux installation must be verified on their respective hosts before describing artifacts as release-tested.
+
+### Native checks before publication
+
+Before creating a release tag, test the exact source candidate natively using a local build under the release signing policy or downloaded artifacts from a `publish=false` workflow run. Record the root/component revisions, artifact hashes, tested OS, actual feature checks and unresolved failures. Use an isolated profile for candidate feature checks; package creation and component mocks alone do not establish native acceptance. Do not describe skipped or provider-blocked scenarios as passed. Resolve required native checks before tagging, and preserve explicit limits for platforms or features that were not exercised.
+
+The final tag workflow rebuilds the installers; it does not promote the exact installer bytes from the earlier verification run. Recheck the published hashes, provenance, signatures and notarization, and repeat any runtime check affected by a source or packaging change. Do not claim that prepublication QA exercised the eventual published bytes.
 
 ## GitHub Actions release pipeline
 
@@ -69,7 +82,7 @@ Open **Actions → Release installers and VPS images → Run workflow**. The `de
 | Docker verification | `false` | `true` | `false` | Linux image builds and smoke checks; no desktop compilation, signing or Apple-secret requirement |
 | Full publication from the matching tag | `true` | `true` | `true` | Both build branches must pass before any GitHub/GHCR publication |
 
-Manual `publish=true` requires both build switches. A release-tag push forces both builds and publication; it cannot produce a partial release. The combined 44 tests, Actionlint and independent source review passed. A real isolated Docker save/remove/load fixture preserved all four image IDs and labels. Hosted Docker-only run [38522234500](https://github.com/ShiftHackZ/ellmsha/actions/runs/38522234500) at `7755a858` passed all four Linux/amd64 image builds, isolated smoke checks and provenance artifact upload with desktop and publication skipped. Full-sized image archive transfer between GitHub jobs, exact loaded-image provenance checks and GitHub/GHCR publication subsequently passed in [run 38526765682, attempt 2](https://github.com/ShiftHackZ/ellmsha/actions/runs/38526765682), publishing [v2026.10.14-patch.10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10). The first attempt encountered a macOS stapler network failure; a targeted macOS/publication retry reused the successful Windows/image results. Independent downloads of all eight release assets, installer/source-provenance checks, both public macOS app bundles' signature/notarization/Gatekeeper checks and four anonymous GHCR pulls passed. Installed native updater and native Windows runtime acceptance remain deferred. The preserved Patch 9 still uses legacy `quitAndInstall`; a real test of Patch 10's `ReleaseInstaller` requires an installed Patch 10 and a genuinely newer release, since same-version downloads are rejected. These distribution checks did not launch or replace production. See the [release status](../../docs/release-status.md) for the recorded checks and boundaries.
+Manual `publish=true` requires both build switches. A release-tag push forces both builds and publication; it cannot produce a partial release. The combined 44 tests, Actionlint and independent source review passed. A real isolated Docker save/remove/load fixture preserved all four image IDs and labels. Hosted Docker-only run [38522234500](https://github.com/ShiftHackZ/ellmsha/actions/runs/38522234500) at `7755a858` passed all four Linux/amd64 image builds, isolated smoke checks and provenance artifact upload with desktop and publication skipped. Full-sized image archive transfer between GitHub jobs, exact loaded-image provenance checks and GitHub/GHCR publication subsequently passed in [run 38526765682, attempt 2](https://github.com/ShiftHackZ/ellmsha/actions/runs/38526765682), publishing [v2026.10.14-patch.10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10). The first attempt encountered a macOS stapler network failure; a targeted macOS/publication retry reused the successful Windows/image results. Independent downloads of all eight release assets, installer/source-provenance checks, both public macOS app bundles' signature/notarization/Gatekeeper checks and four anonymous GHCR pulls passed. Installed native updater and native Windows runtime acceptance remain deferred. At that point the preserved Patch 9 still used legacy `quitAndInstall`; a real test of the newer `ReleaseInstaller` requires an installed version containing it and a genuinely newer release, since same-version downloads are rejected. Patch 11 installation and its remaining runtime limits are now recorded in the release status. These distribution checks did not launch or replace production. See the [release status](../../docs/release-status.md) for the recorded checks and boundaries.
 
 When desktop is selected, macOS always produces **Developer ID signed and notarized arm64 DMG/ZIP** and Windows produces an **unsigned x64 NSIS EXE**. macOS verification uses the same temporary keychain, signed build, stapled-ticket validation and Gatekeeper assessment as publication. Desktop outputs include per-platform `SHA256SUMS-*.txt` and build provenance recording the signing policy and result. The Docker branch builds Linux/amd64 images and runs disposable service smoke tests. Workflow artifacts are retained for 14 days. A successful build does not establish native installation or account-login acceptance.
 
