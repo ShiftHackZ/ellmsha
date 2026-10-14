@@ -1,6 +1,10 @@
 # Release readiness — 2026-10-14
 
-This ledger tracks public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), installed [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. The preceding public binary release is [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md), whose artifacts remain available on GitHub.
+This ledger tracks candidate [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), installed [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. The preceding public binary release is [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md), whose artifacts remain available on GitHub.
+
+## Candidate — 2026-10-14 Patch 11
+
+The user authorized releasing the six reviewed UI/Core fixes through GitHub Actions, followed by reinstalling the accepted macOS build with the existing profile. Changes cover pet focus, slash completion and skill highlighting, BMAD link contrast, child lifecycle status, avatar overflow/running rings and conversation-owned Office previews. Source tests, three independent reviews and bounded component/native checks passed within the limits in the [candidate notes](releases/2026.10.14-patch.11.md). Required `just push` gates passed: AionUI **3,511 tests / 5 skipped**, AionCore **8,443 tests / 26 skipped**, with their lint/format/type/translation/migration checks as applicable. All **44 root release/helper contracts** passed. Hosted builds/publication are pending; this is not yet a published or installed release. Production data and the existing application remain preserved.
 
 ## Source publication checks — 2026-10-13
 
