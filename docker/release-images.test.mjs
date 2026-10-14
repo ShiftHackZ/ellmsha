@@ -3,7 +3,35 @@ import test from 'node:test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { imagePlan, validateManifest, forbiddenContextPath, cleanContext } from './release-images.mjs';
+import { execFileSync } from 'node:child_process';
+import { imagePlan, validateManifest, forbiddenContextPath, cleanContext, archive } from './release-images.mjs';
+test('archive preserves pinned LFS pointer bytes with an active smudge filter', (t) => {
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'ellmsha-archive-lfs-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const repository = path.join(dir, 'repository');
+  fs.mkdirSync(repository);
+  const git = args => execFileSync('git', args, { cwd: repository, env: { ...process.env, GIT_LFS_SKIP_SMUDGE: '0' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  git(['init']);
+  const pointer = 'version https://git-lfs.github.com/spec/v1\noid sha256:' + 'a'.repeat(64) + '\nsize 11\n';
+  fs.writeFileSync(path.join(repository, '.gitattributes'), '*.zip filter=fixture-lfs\n');
+  fs.writeFileSync(path.join(repository, 'fixture.zip'), pointer);
+  fs.writeFileSync(path.join(repository, 'source.txt'), 'unchanged source\n');
+  git(['add', '.']);
+  git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', 'synthetic archive inputs']);
+  const filter = path.join(dir, 'lfs-smudge');
+  fs.writeFileSync(filter, '#!/bin/sh\nif [ "$GIT_LFS_SKIP_SMUDGE" = "1" ]; then cat; else cat >/dev/null; printf "materialized"; fi\n', { mode: 0o755 });
+  git(['config', 'filter.fixture-lfs.smudge', filter]);
+  const before = execFileSync('tar', ['-xOf', '-', 'fixture.zip'], { input: git(['archive', '--format=tar', 'HEAD']), encoding: 'utf8' });
+  assert.equal(before, 'materialized', 'ordinary git archive must exercise the active smudge filter');
+  const output = path.join(dir, 'archive');
+  fs.mkdirSync(output);
+  const prior = process.env.GIT_LFS_SKIP_SMUDGE;
+  process.env.GIT_LFS_SKIP_SMUDGE = '0';
+  try { archive(repository, output); }
+  finally { if (prior === undefined) delete process.env.GIT_LFS_SKIP_SMUDGE; else process.env.GIT_LFS_SKIP_SMUDGE = prior; }
+  assert.equal(fs.readFileSync(path.join(output, 'fixture.zip'), 'utf8'), pointer);
+  assert.equal(fs.readFileSync(path.join(output, 'source.txt'), 'utf8'), 'unchanged source\n');
+});
 test('release manifest binds four amd64 images to exact source/version, never latest', () => {
   const m = imagePlan('2026.10.13-patch.10', 'a'.repeat(40));
   assert.equal(m.images.length, 4);

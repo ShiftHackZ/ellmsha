@@ -55,8 +55,10 @@ export function cleanContext(destination) {
   }
   return removed;
 }
-function archive(repository, destination) {
-  const result = spawnSync('git', ['archive', '--format=tar', 'HEAD'], { cwd: repository, maxBuffer: 512 * 1024 * 1024 });
+export function archive(repository, destination) {
+  // Match checkout's lfs:false: archive must retain the pinned pointer bytes,
+  // even when the runner has an active Git LFS smudge filter.
+  const result = spawnSync('git', ['archive', '--format=tar', 'HEAD'], { cwd: repository, env: { ...process.env, GIT_LFS_SKIP_SMUDGE: '1' }, maxBuffer: 512 * 1024 * 1024 });
   if (result.status !== 0) throw Error('Could not archive source');
   const unpack = spawnSync('tar', ['-xf', '-', '-C', destination], { input: result.stdout, stdio: ['pipe', 'inherit', 'inherit'] });
   if (unpack.status !== 0) throw Error('Could not prepare build context');
