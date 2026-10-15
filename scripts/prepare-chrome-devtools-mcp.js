@@ -12,11 +12,13 @@ const CHROME_DEVTOOLS_MCP_COMMIT = '4f7b06898327ab5be42c85bd98bd176f33d55d89';
 const CHROME_DEVTOOLS_MCP_ORIGIN = 'https://github.com/ShiftHackZ/ellmsha-chrome-devtools-mcp.git';
 const CHROME_DEVTOOLS_MCP_UPSTREAM = 'https://github.com/ChromeDevTools/chrome-devtools-mcp.git';
 const CHROME_DEVTOOLS_MCP_MARKER = '.ellmsha-chrome-devtools-mcp-pin.json';
-const CHROME_DEVTOOLS_MCP_SOURCE_DIGEST = '1483acf6e07cd6246fcceb4035b02f81cdfe2be3838f3cd60d64ff32b3389811';
+const CHROME_DEVTOOLS_MCP_SOURCE_DIGEST = '30d8670bf6c0120b677d9687e92decc507df60cc19c95ebe4d6623ad4786facb';
 const CHROME_DEVTOOLS_MCP_PATCH_FILES = {
-  'tests/index.test.ts': 'cca611fe97f442908d64c524aa2a090bba83323c79b6b3f790163fedf7a44463',
+  'tests/McpResponse.test.ts': 'ce2e8c6562573407053fea8e2ada48d43a0a3a8acc11f9da9ca6681273d64274',
+  'src/McpResponse.ts': 'dbf6da0bcb2b8375337972b3a6abf7c962df5f1ed5772561aecc7c7040a77ffb',
+  'tests/index.test.ts': 'ad81fb7c9d9ccf04953f13b064cbc99bb46f1d730796362d178305cd1ce3c4bd',
   'tests/McpContext.test.ts': 'a61cae2d4cb5dfaef7213664438b3a289649045b4a3e7cf9318d9fa6cdde2d7f',
-  'src/main.ts': 'b0fb76be45c4088bca896a5cff168aa114b099b67cf64c656f7b28e5da1f6cad',
+  'src/main.ts': '9991dae04aa81411a24b1f49d96d053985a6cbfa6a3445e9a4bcf83d4b6f34ac',
   'src/McpContext.ts': 'a45de15cb86cb7e7f33675ada2f9cd846bfb9f448d07055e3a5d3628e9d77069',
   'package-lock.json': '6dd71827cf7e2aefa5953a461649d84c2f07126530fc346f78354ca897ecebba',
   'package.json': '42a7e632039a76783019a57650908c603172a2ec843e3fae7896b26a241af71b',
