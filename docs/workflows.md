@@ -38,21 +38,32 @@ Choose the generation model for the task and a stable embedding model for recall
 
 ## Auto Router
 
-Configure **Auto Router** from **Settings → Agents**, then select it when starting a chat. It reuses existing enabled provider accounts and available agent runtimes; it does not require another set of credentials. Defaults can be overridden for a new chat. The selected root stays pinned for that chat, including after reopening it.
+Configure **Auto Router** from **Settings → Agents**, then select it when starting a chat. The editable diagram uses existing provider accounts and supported agent runtimes. Click a node to choose its account/model or edit its policy; optional model hints stay in advanced settings.
 
-| Mode | Root | Managed children |
+```text
+Root ──→ Default subagents
+  └────→ Classifier ──→ Coding / QA / other custom task classes
+```
+
+The default branch runs directly when there are no custom classes. With classes, the selected classifier returns one matching class ID or no match. A match chooses that class's child target. No match, an invalid response or classifier timeout uses the default branch with an explicit reason. An unavailable matched target fails clearly; it is not silently replaced. Classification never changes the root and never fans out into every class.
+
+| Mode | Root | Default children |
 | --- | --- | --- |
 | Auto | Selected for the initial task | Selected for each child assignment |
 | Semi-auto | Your fixed target | Selected for each child assignment |
 | Manual | Your fixed target | Your fixed child target |
 
-Automatic choices support cost, speed, quality and balanced profiles. Optional model hints supply prices, expected latency, capabilities and task strengths. These are user estimates, not benchmark results. Unknown dimensions are excluded from ranking; without sufficient information the router uses a disclosed stable baseline. An optional configured provider model classifies the task under a bounded timeout. Failure falls back to the disclosed keyword classifier while retaining eligibility constraints. Reasoning effort remains a separate model setting.
+Each mode × optimization preset owns its complete saved graph: targets, classifier, classes, pool, hints and restrictions. Switching back restores that slot; editing another slot does not change it. New slots may copy custom classes once, then evolve independently. Incomplete inactive drafts can be saved, but the active slot needs its required models/classifier before it can be used. Cancel discards the editor's unsaved changes.
 
-Native children can use different configured provider models. Host-managed Team members can select compatible agent runtimes and require an initial assignment. An external CLI's own internal children remain controlled by that CLI; the route details disclose this limit. Manual cross-runtime delegation therefore belongs in a managed Team.
+Cost, Speed, Quality, Balanced and Local-only provide preset policies. Before a chat runs, the diagram shows the policy rather than claiming a model has already been selected. Prices, latency, capabilities and task strengths entered as model hints are user estimates, not benchmarks. Unknown dimensions are excluded from ranking; insufficient evidence uses a disclosed stable baseline. Reasoning effort remains a separate model setting.
 
-**Local inference only** requires an explicitly marked local model with a loopback endpoint and applies to the classifier too. It is not a network sandbox for tools or plugins. Router memory retrieval is skipped in this mode because a local memory endpoint does not establish where its embedding calls run. Otherwise, retrieval uses bounded current-project memory. Explicit review of a completed answer contributes to that workspace's routing history; normal completion and an agent's claim of success do not. Reviews remain user assessments, not objective correctness scores or proof of savings.
+V2 host-managed children are visible conversations in the same workspace and user scope. Supported native/API, Codex and Claude roots can delegate through the host tools to a different supported runtime/account/model. Child approvals stay in the child chat; cancellation propagates and unfinished children are cancelled when the parent turn ends. Provider-internal children remain controlled by that CLI and are outside Auto Router's policy. A catalog entry being configured does not prove its runtime supports host delegation: unsupported or unhealthy choices remain visible with a reason.
 
-The chat's route badge shows the actual selected model and decision reasons. Start a new chat to change the pinned target. A removed, disabled or incompatible target produces a configuration error instead of silently moving the ongoing chat to another model.
+Root and child targets are frozen for their conversations, including resume. A conflicting saved runtime selection is rejected before new work. Start a new chat to change its target. Existing V1 conversation snapshots and their future children retain their original routing behavior; migrating global settings does not rewrite those snapshots. Teams retain their existing separate delegation path.
+
+**Local-only** forbids cloud inference, including classification. A local target needs an explicit local-inference hint and a loopback API endpoint. Conflicting saved assignments stay visible and block execution rather than being erased. This setting is not a network sandbox for tools or plugins. Router memory retrieval is skipped in this mode because a local memory endpoint does not establish where its embedding calls run. Otherwise, retrieval uses bounded current-project memory. Explicit user review of a completed answer contributes to that workspace's routing history; completion and an agent's claim of success do not. Reviews remain user assessments, not objective correctness scores or proof of savings.
+
+The chat's route badge shows the selected target and decision reasons. The configured/live adapter model is used to detect route drift; optimistic runtime metadata alone is not proof of which model a remote provider actually executed. Actual cross-runtime behavior, approvals and cancellation require real task acceptance in addition to unit tests.
 
 ## Finish with evidence
 
