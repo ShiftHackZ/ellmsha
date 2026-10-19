@@ -36,6 +36,24 @@ Connect accounts in a plugin's detail page. State the service workspace/account 
 
 Choose the generation model for the task and a stable embedding model for recall. Check tool-calling behavior with a small task before trusting a long autonomous run. Local inference reduces reliance on a cloud generation endpoint, but plugins and explicitly configured services can still use the network.
 
+## Auto Router
+
+Configure **Auto Router** from **Settings → Agents**, then select it when starting a chat. It reuses existing enabled provider accounts and available agent runtimes; it does not require another set of credentials. Defaults can be overridden for a new chat. The selected root stays pinned for that chat, including after reopening it.
+
+| Mode | Root | Managed children |
+| --- | --- | --- |
+| Auto | Selected for the initial task | Selected for each child assignment |
+| Semi-auto | Your fixed target | Selected for each child assignment |
+| Manual | Your fixed target | Your fixed child target |
+
+Automatic choices support cost, speed, quality and balanced profiles. Optional model hints supply prices, expected latency, capabilities and task strengths. These are user estimates, not benchmark results. Unknown dimensions are excluded from ranking; without sufficient information the router uses a disclosed stable baseline. An optional configured provider model classifies the task under a bounded timeout. Failure falls back to the disclosed keyword classifier while retaining eligibility constraints. Reasoning effort remains a separate model setting.
+
+Native children can use different configured provider models. Host-managed Team members can select compatible agent runtimes and require an initial assignment. An external CLI's own internal children remain controlled by that CLI; the route details disclose this limit. Manual cross-runtime delegation therefore belongs in a managed Team.
+
+**Local inference only** requires an explicitly marked local model with a loopback endpoint and applies to the classifier too. It is not a network sandbox for tools or plugins. Router memory retrieval is skipped in this mode because a local memory endpoint does not establish where its embedding calls run. Otherwise, retrieval uses bounded current-project memory. Explicit review of a completed answer contributes to that workspace's routing history; normal completion and an agent's claim of success do not. Reviews remain user assessments, not objective correctness scores or proof of savings.
+
+The chat's route badge shows the actual selected model and decision reasons. Start a new chat to change the pinned target. A removed, disabled or incompatible target produces a configuration error instead of silently moving the ongoing chat to another model.
+
 ## Finish with evidence
 
 - Verify the behavior in the actual UI when UI is part of the requirement.
