@@ -2,6 +2,12 @@
 
 This ledger tracks the [2026-10-22 Patch 1 candidate](releases/2026.10.22-patch.1.md), public and installed [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), preceding public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), the previous [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) installation and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md) artifacts also remain available on GitHub.
 
+## Windows packaging repair — verification pending
+
+Patch 3 [39775875743](https://github.com/ShiftHackZ/ellmsha/actions/runs/39775875743) passed dependency installation but Windows packaging failed in `afterPack`: fallback `bun x electron-rebuild` downloaded the deprecated unscoped package, whose `node-gyp` 9.4.1 imports removed Python 3.12 `distutils`. Linux image builds passed; macOS was still running when diagnosed. No publication was accepted.
+
+Both native rebuild entry points now resolve the already locked modern `@electron/rebuild` 4.0.4 locally, pass an explicit Electron version, and rebuild the actual packaged module directory without a shell or an unpinned tool download. Focused success/failure regressions and full UI gates passed (3669 tests; 5 skipped). The Windows verification workflow now runs the full unsigned installer build and artifact verification before any next release tag. Full hosted packaging remains pending.
+
 ## Publication correction — 2026-10-22 Patch 3
 
 Patch 2 run [39774125022](https://github.com/ShiftHackZ/ellmsha/actions/runs/39774125022) reproduced the missing `node-gyp` executable on Windows: declaring it locally did not expose it during Bun lifecycle installation. Both prior tags and their artifacts remain unchanged.
