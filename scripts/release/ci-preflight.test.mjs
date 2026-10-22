@@ -16,6 +16,10 @@ test('manual verification accepts candidate dates but never PR events', () => {
   for (const event of ['pull_request', 'pull_request_target', 'workflow_run']) assert.throws(() => validateRelease({ ...input, event, publish: false }), /only tag push/);
   for (const version of ['2026.02.30-patch.1', '2026.13.01-patch.1', '2026.10.13-patch.0', '2026.10.13-patch.1;echo x']) assert.throws(() => validateRelease({ ...input, version }));
 });
+test('manual publication can seed main caches but rejects other branch refs', () => {
+  assert.equal(validateRelease({ ...input, event: 'workflow_dispatch', ref: 'refs/heads/main' }).publish, true);
+  assert.throws(() => validateRelease({ ...input, event: 'workflow_dispatch', ref: 'refs/heads/feature/other' }), /exact tag/);
+});
 test('all runs sign macOS while only publication requires the release tag and date', () => {
   assert.deepEqual(resolveReleaseMode({ GITHUB_EVENT_NAME: 'workflow_dispatch' }), { publish: false, signMacos: true, desktop: true, docker: true });
   for (const event of ['workflow_dispatch', 'push']) {

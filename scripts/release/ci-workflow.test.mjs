@@ -6,7 +6,7 @@ const workflow = readFileSync(new URL('../../.github/workflows/release.yml', imp
 const imageWorkflow = readFileSync(new URL('../../.github/workflows/docker-images.yml', import.meta.url), 'utf8');
 test('release credentials and publication are unavailable to pull-request workflows', () => {
   assert.doesNotMatch(workflow, /pull_request|workflow_run|secrets:\s*inherit/);
-  assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?default: false/);
+  assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?default: true/);
   assert.match(workflow, /publish:\n\s+needs: \[preflight, desktop, images\]\n\s+if: needs\.preflight\.outputs\.publish == 'true'/);
   assert.match(workflow, /group: official-release-publication\n\s+cancel-in-progress: false/);
   assert.match(workflow, /Remove temporary signing material\n\s+if: always\(\)/);
@@ -31,9 +31,6 @@ test('locked desktop installation provides the native build tool and checks SQLi
   assert.match(action, /require\('better-sqlite3'\)/);
   assert.match(action, /new Database\(':memory:'\)/);
   assert.match(action, /SELECT 1 AS ok/);
-  const windows = readFileSync(new URL('../../.github/workflows/windows-dependencies.yml', import.meta.url), 'utf8');
-  assert.match(windows, /uses: \.\/.github\/actions\/install-desktop-dependencies/);
-  assert.doesNotMatch(windows, /secrets\.|environment: release/);
 });
 
 test('desktop packaging has a bounded heap inherited by its Node subprocesses', () => {
@@ -85,13 +82,10 @@ test('desktop and docker verification run independently after preflight with exp
   assert.match(workflow, /publish:\n    needs: \[preflight, desktop, images\]\n    if: needs\.preflight\.outputs\.publish == 'true'/);
 });
 
-test('macOS cache warming stays on main and cannot sign or publish', () => {
-  const verification = readFileSync(new URL('../../.github/workflows/windows-dependencies.yml', import.meta.url), 'utf8');
-  const mac = verification.split('\n  mac-cache:\n')[1];
-  assert.match(mac, /if: inputs\.warm_macos && github\.ref == 'refs\/heads\/main'/);
-  assert.match(mac, /cargo build --locked --release -p aionui-app --bin aioncore/);
-  assert.match(mac, /desktop-mac-arm64-rust1\.95\.0-node24\.11\.0-bun1\.3\.9-/);
-  assert.doesNotMatch(mac, /secrets\.|environment: release|build\.mjs --signed|ci-publish/);
+test('one manually started release checks full source history before expensive compilation', () => {
+  assert.doesNotMatch(workflow, /\n  push:\n/);
+  assert.match(workflow, /submodules: recursive\n\s+fetch-depth: 0/);
+  assert.ok(workflow.indexOf('name: Verify maintained native fork source pins') < workflow.indexOf('\n  desktop:\n'));
 });
 
 test('parallel image builds cannot publish; tested bytes transfer only for gated full publication', () => {

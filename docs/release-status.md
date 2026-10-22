@@ -2,6 +2,12 @@
 
 This ledger tracks the [2026-10-22 Patch 1 candidate](releases/2026.10.22-patch.1.md), public and installed [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), preceding public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), the previous [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) installation and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md) artifacts also remain available on GitHub.
 
+## Single release pipeline — 2026-10-22 Patch 4
+
+At the user's explicit request, separate verification/cache-warmer workflows were removed. The release workflow is manually dispatched on `main` with publication enabled, after creating the matching immutable tag at the exact same source commit. Both initial preflight and publication retain the exact tag/commit check. Desktop and image jobs run in parallel, save platform caches in default-branch scope, and publish only accepted same-run artifacts. Tag push no longer starts a duplicate build. Patch 4 is 2026.10.22-patch.4, UI Patch20, Core Patch17; public notes contain user-visible changes only.
+
+The preceding standalone Windows run failed before packaging because its shallow checkout omitted a pinned upstream Chrome MCP ancestor; this was a defect of that auxiliary workflow, which is now removed. The release pipeline already uses recursive full-history checkout and verifies all source pins before building. Windows locked native tool bootstrap, local modern Electron rebuild, and bounded Apple network-only ticket validation retries are retained. Publication remains pending until the actual full release succeeds.
+
 ## Apple network validation and desktop cache recovery
 
 Patch 3 macOS packaging and notarization completed, but mandatory `stapler validate` failed with Apple CloudKit `NSURLErrorDomain -1005` / exit 68. Only the packaging step was inspected; credential setup logs were not accessed. Validation now retries at most three times (5s/15s backoff) for recognized network failures with exit 68. Invalid tickets and exhausted retries still fail, and Gatekeeper remains mandatory. The helper passed read-only validation of the already installed app; this does not accept the failed Patch 3 candidate. Release contracts passed 47/47.

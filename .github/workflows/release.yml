@@ -1,8 +1,6 @@
 name: Release installers and VPS images
 
 on:
-  push:
-    tags: ['v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-patch.*']
   workflow_dispatch:
     inputs:
       desktop:
@@ -16,7 +14,7 @@ on:
       publish:
         description: 'Publish from the matching release tag. Requires desktop=true and docker=true.'
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read

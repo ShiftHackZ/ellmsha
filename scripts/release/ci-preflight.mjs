@@ -41,7 +41,10 @@ export function validateRelease({ version, branding, event, ref, repository, pub
   if (branding.version !== date || branding.patch !== Number(match[4])) throw new Error('Package version and About release metadata disagree');
   if (!['push', 'workflow_dispatch'].includes(event)) throw new Error('Release workflow accepts only tag push or manual dispatch');
   const tag = `v${version}`;
-  if (event === 'push' || publish) {
+  // A manual release from main writes reusable default-branch caches. main()
+  // still requires the exact release tag to resolve to the checked-out commit.
+  const mainRelease = event === 'workflow_dispatch' && ref === 'refs/heads/main';
+  if ((event === 'push' || publish) && !mainRelease) {
     if (ref !== `refs/tags/${tag}`) throw new Error(`Release must run from the exact tag ${tag}`);
   }
   if (publish) {
