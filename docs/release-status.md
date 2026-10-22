@@ -2,6 +2,12 @@
 
 This ledger tracks the [2026-10-22 Patch 1 candidate](releases/2026.10.22-patch.1.md), public and installed [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), preceding public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), the previous [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) installation and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md) artifacts also remain available on GitHub.
 
+## Publication correction — 2026-10-22 Patch 2
+
+Patch 1 run [39765837689](https://github.com/ShiftHackZ/ellmsha/actions/runs/39765837689) passed signed/notarized macOS and all Linux image builds, but Windows failed during locked dependency installation: Bun could not find `node-gyp` for the `better-sqlite3` lifecycle. Publication was skipped. Existing tag and successful artifacts are retained.
+
+Patch 2 declares the already locked `node-gyp` 12.4.0 as an explicit frontend build dependency and checks actual SQLite startup immediately after locked installation. App version is 2026.10.22-patch.2, UI Patch18, Core Patch17. [Release notes](releases/2026.10.22-patch.2.md) remain user-facing changes only. Hosted validation and publication are pending; exact-source provenance forbids mixing Patch 1 artifacts into the corrected revision.
+
 ## Publication candidate — 2026-10-22 Patch 1
 
 [User-facing release notes](releases/2026.10.22-patch.1.md) cover the unpublished changes since Patch 11: project-isolated desktop browser profiles, Auto Router, Usage, bundled community skills, on-demand tools, mandatory project guidance and pet/icon corrections. The release date is Europe/Kyiv and the first release for this date is Patch 1. UI is Patch 17; Core is Patch 17, including a behavior-preserving Usage HTTP-boundary move required by the pre-push lint gate. Provider factory fixtures use their existing explicit synthetic-test scope; production mandatory guidance is unchanged.

@@ -19,6 +19,17 @@ test('release credentials and publication are unavailable to pull-request workfl
   assert.doesNotMatch(workflow, /path:.*(?:ellmsha-signing|source-manifest|github\.workspace)/);
 });
 
+test('locked desktop installation provides the native build tool and checks SQLite startup', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../../aionui/package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.devDependencies['node-gyp'], '12.4.0');
+  const install = workflow.split('name: Install locked dependencies\n')[1].split('\n      - ')[0];
+  assert.match(install, /bun install --frozen-lockfile/);
+  assert.doesNotMatch(install, /--ignore-scripts/);
+  assert.match(install, /require\('better-sqlite3'\)/);
+  assert.match(install, /new Database\(':memory:'\)/);
+  assert.match(install, /SELECT 1 AS ok/);
+});
+
 test('desktop packaging has a bounded heap inherited by its Node subprocesses', () => {
   const desktop = workflow.split('\n  desktop:\n')[1].split('\n  images:\n')[0];
   assert.match(desktop, /\n    env:\n[\s\S]*?NODE_OPTIONS: '--max-old-space-size=4096'/);
