@@ -85,6 +85,15 @@ test('desktop and docker verification run independently after preflight with exp
   assert.match(workflow, /publish:\n    needs: \[preflight, desktop, images\]\n    if: needs\.preflight\.outputs\.publish == 'true'/);
 });
 
+test('macOS cache warming stays on main and cannot sign or publish', () => {
+  const verification = readFileSync(new URL('../../.github/workflows/windows-dependencies.yml', import.meta.url), 'utf8');
+  const mac = verification.split('\n  mac-cache:\n')[1];
+  assert.match(mac, /if: inputs\.warm_macos && github\.ref == 'refs\/heads\/main'/);
+  assert.match(mac, /cargo build --locked --release -p aionui-app --bin aioncore/);
+  assert.match(mac, /desktop-mac-arm64-rust1\.95\.0-node24\.11\.0-bun1\.3\.9-/);
+  assert.doesNotMatch(mac, /secrets\.|environment: release|build\.mjs --signed|ci-publish/);
+});
+
 test('parallel image builds cannot publish; tested bytes transfer only for gated full publication', () => {
   assert.match(workflow, /if: needs\.preflight\.outputs\.publish == 'true' && needs\.desktop\.result == 'success' && needs\.images\.result == 'success'/);
   assert.doesNotMatch(imageWorkflow, /packages: write|docker\/login-action|release-images\.mjs publish|push: true|secrets\./);
