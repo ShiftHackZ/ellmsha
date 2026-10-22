@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // CI only. Credentials are never written to the checkout or included in artifacts.
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -67,11 +67,30 @@ function runSecret(command, args) {
   catch { throw new Error(`${command} signing operation failed; no credentials were logged`); }
 }
 
+export function validateStapledApp(app, {
+  run = spawnSync,
+  wait = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
+  log = console.log,
+} = {}) {
+  if (!app) throw new Error('Stapler validation requires an app path');
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = run('xcrun', ['stapler', 'validate', app], { encoding: 'utf8', timeout: 120000 });
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+    log(output);
+    if (!result.error && result.status === 0) return;
+    const transient = result.status === 68 && /NSURLErrorDomain[^\n]*(?:-1005|-1001|-1009)|network connection was lost|network connection timed out/i.test(output);
+    if (!transient || attempt === 2) throw new Error(`Stapler validation failed (exit ${result.status ?? 'unknown'}); mandatory validation was not passed`);
+    log(`Apple ticket lookup lost its network connection; retry ${attempt + 2}/3`);
+    wait([5000, 15000][attempt]);
+  }
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     if (process.platform !== 'darwin') throw new Error('macOS signing requires a native macOS runner');
     if (process.argv[2] === 'setup') setupSigning();
     else if (process.argv[2] === 'cleanup') cleanupSigning();
-    else throw new Error('Use setup or cleanup');
+    else if (process.argv[2] === 'validate') validateStapledApp(process.argv[3]);
+    else throw new Error('Use setup, cleanup or validate');
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

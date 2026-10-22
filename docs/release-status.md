@@ -2,6 +2,12 @@
 
 This ledger tracks the [2026-10-22 Patch 1 candidate](releases/2026.10.22-patch.1.md), public and installed [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), preceding public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), the previous [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) installation and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md) artifacts also remain available on GitHub.
 
+## Apple network validation and desktop cache recovery
+
+Patch 3 macOS packaging and notarization completed, but mandatory `stapler validate` failed with Apple CloudKit `NSURLErrorDomain -1005` / exit 68. Only the packaging step was inspected; credential setup logs were not accessed. Validation now retries at most three times (5s/15s backoff) for recognized network failures with exit 68. Invalid tickets and exhausted retries still fail, and Gatekeeper remains mandatory. The helper passed read-only validation of the already installed app; this does not accept the failed Patch 3 candidate. Release contracts passed 47/47.
+
+The Windows Patch 3 log attributes 28m45s to the Rust release build and about 5.5 minutes to later packaging before failure. Desktop cache restore now falls back across lockfile changes within the same target/toolchain; Cargo and locked package installation still validate inputs. GitHub cache scope also matters: one tag cannot restore another tag's cache, while default-branch caches are available to releases. Candidate verification on `main` warms reusable caches; tag-only runs cannot supply a common cache for subsequent tags. See https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching . Windows full verification is running on `main`; macOS still needs a default-branch warm build before cross-tag cache reuse can be measured. No speedup is claimed yet.
+
 ## Windows packaging repair — verification pending
 
 Patch 3 [39775875743](https://github.com/ShiftHackZ/ellmsha/actions/runs/39775875743) passed dependency installation but Windows packaging failed in `afterPack`: fallback `bun x electron-rebuild` downloaded the deprecated unscoped package, whose `node-gyp` 9.4.1 imports removed Python 3.12 `distutils`. Linux image builds passed; macOS was still running when diagnosed. No publication was accepted.

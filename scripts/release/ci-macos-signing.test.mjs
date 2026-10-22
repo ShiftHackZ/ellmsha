@@ -3,7 +3,23 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { cleanupSigning, setupSigning, signingConfig } from './ci-macos-signing.mjs';
+import { cleanupSigning, setupSigning, signingConfig, validateStapledApp } from './ci-macos-signing.mjs';
+
+test('stapler retries transient Apple lookup errors without skipping final validation', () => {
+  let calls = 0;
+  const waits = [];
+  validateStapledApp('/fixture/app.app', { run: () => ++calls < 3 ? { status: 68, stderr: 'NSURLErrorDomain Code=-1005 network connection was lost' } : { status: 0 }, wait: (ms) => waits.push(ms), log: () => {} });
+  assert.equal(calls, 3);
+  assert.deepEqual(waits, [5000, 15000]);
+});
+
+test('stapler fails closed for permanent ticket errors and exhausted network retries', () => {
+  for (const [output, expectedCalls] of [['The ticket is invalid', 1], ['NSURLErrorDomain Code=-1005', 3]]) {
+    let calls = 0;
+    assert.throws(() => validateStapledApp('/fixture/app.app', { run: () => { calls++; return { status: 68, stderr: output }; }, wait: () => {}, log: () => {} }), /mandatory validation was not passed/);
+    assert.equal(calls, expectedCalls);
+  }
+});
 
 const secrets = { MAC_CERTIFICATE_P12_BASE64: Buffer.from('synthetic certificate').toString('base64'), MAC_CERTIFICATE_PASSWORD: 'fixture-p12', MAC_SIGNING_IDENTITY: 'Developer ID Application: Fixture (ABCDEFGHIJ)', MAC_TEAM_ID: 'ABCDEFGHIJ', MAC_NOTARY_APPLE_ID: 'fixture@example.invalid', MAC_NOTARY_APP_PASSWORD: 'fixture-notary' };
 test('public signing cannot silently use local development or missing credentials', () => {

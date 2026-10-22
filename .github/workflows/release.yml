@@ -149,6 +149,7 @@ jobs:
           key: desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-${{ needs.preflight.outputs.source_ref }}
           restore-keys: |
             desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-
+            desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-
       - name: Record exact checkout provenance
         run: node scripts/release/ci-preflight.mjs
       - name: Install locked dependencies
@@ -167,7 +168,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           node scripts/release/build.mjs --signed
-          xcrun stapler validate aionui/out/mac-arm64/eLLMsha.app
+          node scripts/release/ci-macos-signing.mjs validate aionui/out/mac-arm64/eLLMsha.app
           spctl --assess --type execute --verbose=2 aionui/out/mac-arm64/eLLMsha.app
           echo 'RELEASE_SIGNING=developer-id-notarized' >> "$GITHUB_ENV"
       - name: Build Windows x86_64 installer

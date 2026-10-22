@@ -53,7 +53,7 @@ test('signed verification wires the same signing lifecycle without enabling publ
   assert.match(workflow, /name: \$\{\{ matrix.target \}\} \(\$\{\{ matrix.signing \}\}; \$\{\{ needs.preflight.outputs.publish == 'true' && 'release' \|\| 'verification' \}\}\)/);
   assert.match(workflow, /Prepare ephemeral Developer ID keychain and notarization\n\s+if: runner.os == 'macOS'\n/);
   const macBuild = workflow.split('name: Build macOS installers\n')[1].split('\n      - ')[0];
-  assert.match(macBuild, /node scripts\/release\/build.mjs --signed\n\s+xcrun stapler validate[^\n]+\n\s+spctl --assess/);
+  assert.match(macBuild, /node scripts\/release\/build.mjs --signed\n\s+node scripts\/release\/ci-macos-signing.mjs validate[^\n]+\n\s+spctl --assess/);
   assert.doesNotMatch(macBuild, /publish|--unsigned/);
   const winBuild = workflow.split('name: Build Windows x86_64 installer\n')[1].split('\n      - ')[0];
   assert.match(winBuild, /node scripts\/release\/build.mjs --unsigned/);
@@ -71,6 +71,7 @@ test('failed packaging retains the same non-secret cache paths without saving ca
   assert.doesNotMatch(paths(save), /signing|keychain|\.p12|source-manifest|release-installers/);
   assert.match(save, /key: \$\{\{ steps\.desktop-cache\.outputs\.cache-primary-key \}\}/);
   assert.match(workflow, /Retain build cache after packaging failure\n\s+if: \$\{\{ !cancelled\(\) && steps\.desktop-cache\.outputs\.cache-primary-key != '' && steps\.desktop-cache\.outputs\.cache-hit != 'true' \}\}/);
+  assert.match(restore, /restore-keys: \|[\s\S]*\n            desktop-\$\{\{ matrix.target \}\}-rust1\.95\.0-node24\.11\.0-bun1\.3\.9-\n?$/);
 });
 
 test('desktop and docker verification run independently after preflight with explicit default-on flags', () => {
