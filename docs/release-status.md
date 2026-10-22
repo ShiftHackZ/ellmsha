@@ -2,6 +2,12 @@
 
 This ledger tracks the [2026-10-22 Patch 1 candidate](releases/2026.10.22-patch.1.md), public and installed [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), preceding public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), the previous [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) installation and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md) artifacts also remain available on GitHub.
 
+## Publication correction — 2026-10-22 Patch 3
+
+Patch 2 run [39774125022](https://github.com/ShiftHackZ/ellmsha/actions/runs/39774125022) reproduced the missing `node-gyp` executable on Windows: declaring it locally did not expose it during Bun lifecycle installation. Both prior tags and their artifacts remain unchanged.
+
+The shared desktop installation action now bootstraps pinned `node-gyp` 12.4.0 in the Windows runner PATH before frozen Bun installation. Independent clean Windows run [39774802453](https://github.com/ShiftHackZ/ellmsha/actions/runs/39774802453) passed the exact action, including actual SQLite startup (`SELECT 1`). The release uses that same action. Local release contracts passed 45/45. Patch 3 is 2026.10.22-patch.3, UI Patch19, Core Patch17; [public notes](releases/2026.10.22-patch.3.md) contain user-visible changes only. Full corrected release validation/publication remains pending.
+
 ## Publication correction — 2026-10-22 Patch 2
 
 Patch 1 run [39765837689](https://github.com/ShiftHackZ/ellmsha/actions/runs/39765837689) passed signed/notarized macOS and all Linux image builds, but Windows failed during locked dependency installation: Bun could not find `node-gyp` for the `better-sqlite3` lifecycle. Publication was skipped. Existing tag and successful artifacts are retained.
