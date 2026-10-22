@@ -11,7 +11,7 @@ test('release credentials and publication are unavailable to pull-request workfl
   assert.match(workflow, /group: official-release-publication\n\s+cancel-in-progress: false/);
   assert.match(workflow, /Remove temporary signing material\n\s+if: always\(\)/);
   for (const line of workflow.split('\n').filter((line) => /uses:/.test(line))) {
-    if (line.includes('./.github/workflows/')) continue;
+    if (line.includes('./.github/')) continue;
     assert.match(line, /@[a-f0-9]{40}(?:\s|$)/, 'Every external action must be pinned to a commit');
   }
   // Only the allowlisted staging directory may be uploaded, never the checkout or keychain directory.
@@ -23,11 +23,17 @@ test('locked desktop installation provides the native build tool and checks SQLi
   const pkg = JSON.parse(readFileSync(new URL('../../aionui/package.json', import.meta.url), 'utf8'));
   assert.equal(pkg.devDependencies['node-gyp'], '12.4.0');
   const install = workflow.split('name: Install locked dependencies\n')[1].split('\n      - ')[0];
-  assert.match(install, /bun install --frozen-lockfile/);
-  assert.doesNotMatch(install, /--ignore-scripts/);
-  assert.match(install, /require\('better-sqlite3'\)/);
-  assert.match(install, /new Database\(':memory:'\)/);
-  assert.match(install, /SELECT 1 AS ok/);
+  assert.match(install, /uses: \.\/.github\/actions\/install-desktop-dependencies/);
+  const action = readFileSync(new URL('../../.github/actions/install-desktop-dependencies/action.yml', import.meta.url), 'utf8');
+  assert.match(action, /if: runner.os == 'Windows'[\s\S]*npm install --global node-gyp@12\.4\.0/);
+  assert.match(action, /bun install --frozen-lockfile/);
+  assert.doesNotMatch(action, /--ignore-scripts/);
+  assert.match(action, /require\('better-sqlite3'\)/);
+  assert.match(action, /new Database\(':memory:'\)/);
+  assert.match(action, /SELECT 1 AS ok/);
+  const windows = readFileSync(new URL('../../.github/workflows/windows-dependencies.yml', import.meta.url), 'utf8');
+  assert.match(windows, /uses: \.\/.github\/actions\/install-desktop-dependencies/);
+  assert.doesNotMatch(windows, /secrets\.|environment: release/);
 });
 
 test('desktop packaging has a bounded heap inherited by its Node subprocesses', () => {

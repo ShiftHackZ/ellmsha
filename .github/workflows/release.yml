@@ -152,10 +152,7 @@ jobs:
       - name: Record exact checkout provenance
         run: node scripts/release/ci-preflight.mjs
       - name: Install locked dependencies
-        working-directory: aionui
-        run: |
-          bun install --frozen-lockfile
-          node -e "const Database=require('better-sqlite3');const db=new Database(':memory:');if(db.prepare('SELECT 1 AS ok').get().ok!==1)throw new Error('SQLite startup check failed');db.close();console.log('SQLite startup check passed')"
+        uses: ./.github/actions/install-desktop-dependencies
       - name: Prepare ephemeral Developer ID keychain and notarization
         if: runner.os == 'macOS'
         env:

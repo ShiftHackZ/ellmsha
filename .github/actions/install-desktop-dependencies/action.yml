@@ -1,0 +1,17 @@
+name: Install desktop dependencies
+description: Install locked dependencies and verify native SQLite startup.
+runs:
+  using: composite
+  steps:
+    - name: Bootstrap Windows native build tool
+      if: runner.os == 'Windows'
+      shell: bash
+      run: |
+        npm install --global node-gyp@12.4.0
+        node-gyp --version
+    - name: Install and verify SQLite
+      shell: bash
+      working-directory: aionui
+      run: |
+        bun install --frozen-lockfile
+        node -e "const Database=require('better-sqlite3');const db=new Database(':memory:');if(db.prepare('SELECT 1 AS ok').get().ok!==1)throw new Error('SQLite startup check failed');db.close();console.log('SQLite startup check passed')"
