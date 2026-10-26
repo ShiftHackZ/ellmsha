@@ -1,0 +1,16 @@
+{
+  "name": "ellmsha-copilot-ide-probe",
+  "displayName": "eLLMsha Copilot IDE Probe",
+  "publisher": "ellmsha",
+  "version": "0.0.1",
+  "private": true,
+  "engines": { "vscode": "^1.144.0" },
+  "main": "./probe.cjs",
+  "activationEvents": ["onStartupFinished", "onCommand:ellmsha.copilot.probe", "onCommand:ellmsha.copilot.signIn"],
+  "contributes": {
+    "commands": [
+      { "command": "ellmsha.copilot.signIn", "title": "eLLMsha: Sign in to GitHub for Copilot Probe" },
+      { "command": "ellmsha.copilot.probe", "title": "eLLMsha: Probe Copilot IDE Access" }
+    ]
+  }
+}

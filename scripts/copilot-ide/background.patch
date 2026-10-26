@@ -1,0 +1,20 @@
+--- a/src/main.ts
++++ b/src/main.ts
+@@ -7,4 +7,17 @@
+ 
+ enableNodeCompileCache('main');
+ 
++// eLLMsha prototype: a real Code OSS host, with its editor windows suppressed.
++// Authentication setup runs separately without ELLMSHA_IDE_BACKGROUND.
++if (process.env['ELLMSHA_IDE_BACKGROUND'] === '1') {
++	const { app } = await import('electron');
++	app.on('browser-window-created', (_event, window) => {
++		window.show = () => {};
++		window.showInactive = () => {};
++		window.focus = () => {};
++		window.setSkipTaskbar(true);
++	});
++	void app.whenReady().then(() => app.dock?.hide());
++}
++
+ await import('./mainImpl.js');
