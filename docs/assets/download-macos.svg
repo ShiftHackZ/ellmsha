@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="248" height="80" viewBox="0 0 248 80" role="img" aria-labelledby="title desc">
+  <title id="title">Download eLLMsha for macOS</title>
+  <desc id="desc">Apple silicon. Open the latest eLLMsha release on GitHub.</desc>
+  <!-- Apple glyph: Simple Icons, CC0; https://github.com/simple-icons/simple-icons/blob/develop/icons/apple.svg -->
+  <rect x=".75" y=".75" width="246.5" height="78.5" rx="13" fill="#111" stroke="#6b7280" stroke-width="1.5"/>
+  <g transform="translate(20 22) scale(1.5)"><path fill="#fff" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></g>
+  <g fill="#fff" font-family="Arial, Helvetica, sans-serif">
+    <text x="72" y="23" font-size="12" letter-spacing=".4">DOWNLOAD FOR</text>
+    <text x="71" y="51" font-size="28" font-weight="600">macOS</text>
+    <text x="73" y="67" font-size="11" fill="#cbd5e1">Apple silicon</text>
+  </g>
+</svg>

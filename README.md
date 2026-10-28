@@ -22,18 +22,16 @@ A product rarely fits in one repository or one chat. The backend, web app and mo
 
 eLLMsha brings those pieces into one desktop harness. Use your preferred coding agent, keep durable project knowledge in memory, work across several codebases and follow delegated work without losing its history.
 
-## What you can do
+## What's special about eLLMsha
 
-| Your work | In eLLMsha |
-| --- | --- |
-| Move between cloud and local models | Coding-agent connections and a built-in agent with Ollama support |
-| Continue a task in a fresh chat | Project memory, searchable chat history and shared workflow artifacts |
-| Work on backend + frontend + mobile | Multiple workspace roots, repository discovery and per-repository code indexes |
-| Delegate a bounded task | Visible parent/child activity and read-only subagent histories |
-| Bring your tools | Plugin catalog, account connections, MCPs and compatible skill packages |
-| Inspect a running product | In-app browser tabs, Mobile MCP and native Computer Use integrations |
+- **Project rules arrive before the task.** A project's remembered rules are loaded before its prompt is executed, including delegated work. Decisions, BMAD specifications and reusable findings stay available when you open a fresh chat or choose another agent.
+- **One product can span several repositories.** Attach the backend, frontend and mobile client to the same project. Memory stays with the project; source indexes and search retain each repository's identity.
+- **Build an agent team on a diagram.** Auto Router separates the root model, default subagents and task classifier. Add model overrides for coding, QA or research, choose a cost/speed/quality priority, and keep independent settings for automatic, semi-automatic and manual modes. Available routes follow each adapter's capabilities.
+- **A desktop browser with project-specific sign-ins.** Real Chromium tabs keep cookies, storage and history separate between projects. Chats within a project share its browser profile; ordinary chats share a separate default profile.
+- **Useful tools without an enormous starting prompt.** Skills and MCP tools are discovered and loaded as needed. Per-chat and global Usage views expose token consumption and context composition, distinguishing reported counters from estimates or unavailable measurements.
+- **Several work accounts, one workspace.** Connect multiple Linear, Notion and Clockify identities. Agents can use the appropriate account without permanently binding a project folder to it; ambiguous requests require an account choice.
 
-**Desktop memory runs without Docker.** Its services and Node runtime are bundled with the application. Docker is an option for server deployment.
+**The desktop bundles its backend, memory services and their runtime.** No Docker setup is needed for desktop memory. Cloud/API models, installed coding agents and local Ollama models use the same project workspace.
 
 <details>
 <summary><strong>See the desktop plugin catalog</strong></summary>
@@ -53,24 +51,88 @@ Installed macOS test profile after rebuilding its fixture with a 768-dimensional
 
 </details>
 
-## Start with the desktop
+## Desktop app
 
-Download installers and read their changelog from the **[latest published release](https://github.com/ShiftHackZ/ellmsha/releases/latest)**. Each release states its available platforms and signing status; a source commit or tag alone is not an installer release.
+<p>
+  <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-macos.svg" alt="Download eLLMsha for macOS — Apple silicon" height="72"></a>
+  <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-windows.svg" alt="Download eLLMsha for Windows — x64" height="72"></a>
+</p>
 
-1. Download the installer for your platform from the release page, or build from source using the [desktop build guide](scripts/release/README.md).
-2. Open a project folder, then attach any additional codebases from the Files panel.
-3. Choose an agent/model. For local inference, configure Ollama and install the models you need.
-4. Open **Settings → Memory** to configure the embedding model; open **Plugins** to connect integrations.
-5. Start with a concrete task and an observable definition of done.
+Choose the **macOS Apple silicon DMG** or **Windows x64 EXE** on the [latest release page](https://github.com/ShiftHackZ/ellmsha/releases/latest). macOS releases are Developer ID signed and notarized; Windows installers are currently unsigned.
 
-Clone the harness together with its exact maintained fork revisions:
+1. Install the app and open a project folder. Attach additional repositories from the Files panel when needed.
+2. Choose an agent and model. For local inference, configure Ollama and download a suitable model.
+3. Open **Settings → Memory** to select the embedding model, and **Settings → Plugins** to connect your work accounts.
+4. Give the agent a task; inspect its tools, delegated work and Usage alongside the conversation.
+
+To build from source, clone the exact maintained component revisions:
 
 ```bash
 git clone --recurse-submodules https://github.com/ShiftHackZ/ellmsha.git
 cd ellmsha
 ```
 
-The root commit pins each component; do not replace those revisions with upstream `main`. See the [build guide](scripts/release/README.md) for prerequisites.
+Follow the [desktop build guide](scripts/release/README.md). The root commit pins component revisions; `main` uses `ellmsha-main` integration branches in the forks.
+
+## Hosted docker instance
+
+Run the browser-based workspace on a **Linux amd64 VPS or local Linux machine** with Docker Engine and Compose v2. The published [`ghcr.io/shifthackz/ellmsha-web:latest`](https://github.com/ShiftHackZ/ellmsha/pkgs/container/ellmsha-web) image includes the WebUI, AionCore and AionRS.
+
+Save this as `docker-compose.yml` in a new deployment directory:
+
+```yaml
+name: ellmsha
+services:
+  ellmsha:
+    image: ghcr.io/shifthackz/ellmsha-web:latest
+    platform: linux/amd64
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ELLM_SHA_PORT:-3000}:3000"
+    environment:
+      AIONUI_PORT: "3000"
+      AIONUI_ALLOW_REMOTE: "true"
+      AIONUI_DATA_DIR: /data
+      AIONUI_OPEN_BROWSER: "0"
+    volumes:
+      - ellmsha-data:/data
+      - ${ELLM_SHA_WORKSPACES:-./workspaces}:/workspaces
+    extra_hosts:
+      - host.docker.internal:host-gateway
+volumes:
+  ellmsha-data:
+```
+
+```bash
+mkdir -p workspaces
+docker compose pull
+docker compose up -d
+```
+
+Open **http://127.0.0.1:3000**. On first launch, `docker compose logs ellmsha` shows the generated login credentials; sign in and change the password in the UI. On a VPS, connect from your computer with `ssh -N -L 3000:127.0.0.1:3000 user@your-vps`, then open the same address. The example keeps the published port local to the host; use an authenticated HTTPS reverse proxy when providing public access.
+
+| Environment variable | Purpose |
+| --- | --- |
+| `AIONUI_PORT=3000` | HTTP port inside the container; keep it aligned with the image's startup command and port mapping. |
+| `AIONUI_ALLOW_REMOTE=true` | Allows the WebUI server to listen beyond container loopback. The host port above remains bound to `127.0.0.1`. |
+| `AIONUI_DATA_DIR=/data` | Persistent application state, including chats, settings and connections. Keep the `ellmsha-data` volume across updates. |
+| `AIONUI_OPEN_BROWSER=0` | Prevents an attempt to launch a desktop browser in the container. |
+| `ELLM_SHA_PORT` | Compose setting for the host port; defaults to `3000`. |
+| `ELLM_SHA_WORKSPACES` | Compose setting for the host project directory mounted at `/workspaces`; defaults to `./workspaces`. Mount only repositories the agents should access. |
+
+**Shared memory uses additional services.** The example above starts the agent workspace. To enable the memory panel, persistent project memory and code indexes, follow the [full memory-stack bootstrap and Compose guide](docker/README.md#first-installation-bootstrap-once-then-use-pull-only-compose). That setup creates the private identities, configuration and persistent volumes required by the services. Use the following published images for the stack:
+
+| Image | Contains |
+| --- | --- |
+| `ghcr.io/shifthackz/ellmsha-web:latest` | WebUI, application backend and native agent engine |
+| `ghcr.io/shifthackz/ellmsha-memory-core:latest` | Durable memory and search |
+| `ghcr.io/shifthackz/ellmsha-memory-hub:latest` | Memory settings panel, Wiki and code-index services |
+| `ghcr.io/shifthackz/ellmsha-memory-proxy:latest` | Optional model proxy |
+
+Set the full-stack guide's `ELLM_SHA_WEB_IMAGE`, `MEMORY_CORE_IMAGE`, `MEMORY_HUB_IMAGE` and optional `PROXY_IMAGE` overrides to these references. Its `MEMORY_EMBEDDING_*` settings choose the search encoder independently of chat models; `KNOWLEDGE_SERVICE_KEY` and the private memory connection files come from bootstrap. See [.env.example](.env.example) for the complete configuration. For updates, pull and recreate containers while retaining application and memory volumes. `latest` follows the current published release; release tags and the digests in `images.json` are also available when you need a fixed version.
+
+Desktop Chromium tabs and the embedded Copilot IDE runtime are desktop features; the hosted WebUI runs in your existing browser.
 
 ## Memory that follows the project
 
@@ -84,25 +146,54 @@ Built-in integrations live in `plugins/<plugin>`. Start with the [plugin-authori
 
 ## Built on maintained forks
 
+These four forks form the application itself. We adapt them together so project context, tools and delegated work can follow a task through the interface, session layer and agent runtime.
+
 | Component | Role |
 | --- | --- |
-| [AionUI](https://github.com/ShiftHackZ/ellmsha-AionUi/tree/feature/ellmsha-v2026.10.9-patch1) | Electron/React desktop and WebUI |
-| [AionCore](https://github.com/ShiftHackZ/ellmsha-AionCore/tree/feature/ellmsha-v2026.10.9-patch1) | Agent sessions, tools and application services |
-| [AionRS](https://github.com/ShiftHackZ/ellmsha-aionrs/tree/feature/ellmsha-v2026.10.9-patch1) | Native agent runtime |
-| [TencentDB Agent Memory](https://github.com/ShiftHackZ/ellmsha-TencentDB-Agent-Memory/tree/feature/ellmsha-v2026.10.9-patch1) | Durable memory, knowledge and code indexes |
-| [BMAD Method](https://github.com/ShiftHackZ/ellmsha-BMAD-METHOD/tree/feature/ellmsha-v2026.10.9-patch1) | Structured planning and delivery workflows |
-| [Ponytail](https://github.com/ShiftHackZ/ellmsha-ponytail/tree/feature/ellmsha-v2026.10.9-patch1) | Simplicity-oriented engineering skills |
-| [Mobile MCP](https://github.com/ShiftHackZ/ellmsha-mobile-mcp/tree/feature/ellmsha-v2026.10.9-patch1) | Android and iOS automation |
-| [Chrome DevTools MCP](https://github.com/ShiftHackZ/ellmsha-chrome-devtools-mcp/tree/feature/ellmsha-v2026.10.9-patch1) | Browser inspection and automation |
-| [Open Computer Use](https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use/tree/feature/ellmsha-v2026.10.9-patch1) | Native desktop automation |
+| [AionUI](https://github.com/ShiftHackZ/ellmsha-AionUi/tree/ellmsha-main) | **Desktop and WebUI.** Our changes add project-isolated Chromium tabs, the visual routing editor, Usage dashboards, multi-account plugin settings and bundled service lifecycle management. |
+| [AionCore](https://github.com/ShiftHackZ/ellmsha-AionCore/tree/ellmsha-main) | **Application and agent-session backend.** We added project-rule preflight, on-demand tool discovery, routing and usage plumbing, project-scoped channel sessions, and account-aware integrations. |
+| [AionRS](https://github.com/ShiftHackZ/ellmsha-aionrs/tree/ellmsha-main) | **Native agent engine.** Our integration connects project memory, skill/tool loading and subagent execution to the harness's session and routing policies. |
+| [TencentDB Agent Memory](https://github.com/ShiftHackZ/ellmsha-TencentDB-Agent-Memory/tree/ellmsha-main) | **Persistent memory, Wiki and source indexes.** We added project guidance and searchable workflow artifacts, per-repository indexing, and generation callbacks that use the originating chat's model while embeddings remain independently configured. |
 
-About shows upstream and patch provenance for the current build. Core integrations are maintained as forks; ordinary package dependencies remain ordinary dependencies. Upstream authors retain their licenses and credits. See the [component license inventory](docs/component-licenses.md).
+The root pins exact fork commits. Integration branch names follow `ellmsha-<root-branch>`; upstream provenance and eLLMsha patch numbers are visible in **About**. Original authors retain their licenses and credits; see the [component license inventory](docs/component-licenses.md).
+
+## Bundled tools
+
+These are shipped alongside the core as skills, plugins or tool runtimes. Service integrations require your own accounts and permissions; desktop/device automation requires the corresponding local environment.
+
+| Component | Role |
+| --- | --- |
+| [BMAD Method](https://github.com/ShiftHackZ/ellmsha-BMAD-METHOD/tree/ellmsha-main) | **Bundled skill suite** — planning, specifications, architecture, implementation and review, adapted to store shared artifacts in project memory. |
+| [Ponytail](https://github.com/ShiftHackZ/ellmsha-ponytail/tree/ellmsha-main) | **Bundled skill suite** — simplicity-focused implementation, review and technical-debt workflows. |
+| [Mobile MCP](https://github.com/ShiftHackZ/ellmsha-mobile-mcp/tree/ellmsha-main) | **Bundled plugin + MCP runtime** — interact with connected Android/iOS devices and simulators. |
+| [Chrome DevTools MCP](https://github.com/ShiftHackZ/ellmsha-chrome-devtools-mcp/tree/ellmsha-main) | **Bundled MCP runtime** — inspect and automate browser pages through the maintained browser integration. |
+| [Open Computer Use](https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use/tree/ellmsha-main) | **Bundled plugin + native MCP runtime** — operate desktop applications through their accessibility interfaces. |
+| [Linear](plugins/linear) | **eLLMsha plugin + skill** — multiple OAuth accounts, issues, projects, comments and attachments through Linear's hosted MCP. |
+| [Notion](plugins/notion) | **eLLMsha plugin + skill** — multiple OAuth identities/workspaces for pages, databases, search and comments through Notion's hosted MCP. |
+| [Clockify](plugins/clockify) | **eLLMsha plugin + skill** — independent API-key accounts, time reports and approval-gated time-entry changes. |
+| [Plugin Authoring](plugins/plugin-dev) | **eLLMsha plugin + skill/templates** — create, validate and install compatible plugin packages, including selected Git subdirectories. |
+| [Copilot IDE bridge](scripts/copilot-ide/PROVIDER.md) | **Bundled desktop provider/runtime** — use Copilot models through an isolated, lazily started Code OSS extension host with persistent sign-in. GitHub account and organization access policies still apply. |
+| [eLLMsha setup and troubleshooting](aionui/resources/ellmsha-skills) | **Built-in skills** — configure agents, memory and WebUI deployment, and diagnose the installed harness. |
+| [REA](https://github.com/morluto/rea) | **Bundled skill** — reverse-engineer an existing codebase and its architecture. |
+| [Hallmark](https://github.com/Nutlope/hallmark) | **Bundled skill** — develop more deliberate visual designs. |
+| [Humanizer](https://github.com/blader/humanizer) | **Bundled skill** — edit formulaic AI writing into more natural prose. |
+| [Impeccable](https://github.com/pbakaus/impeccable) | **Bundled skill set** — audit and refine interface design. |
+| [UI/UX Pro Max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | **Bundled skill + reference data** — UI patterns, typography, colors and design-system guidance. |
+| [Last 30 Days](https://github.com/mvanhorn/last30days-skill) | **Bundled skill + scripts** — research recent discussions and trends; source access may require additional credentials. |
+| [Scrapling](https://github.com/D4Vinci/Scrapling) | **Bundled skill + examples** — guide web scraping with Scrapling; install its Python/browser dependencies when using it. |
+| [Diagram Design](https://github.com/cathrynlavery/diagram-design) | **Bundled skill** — create and refine technical diagrams. |
+
+The catalog supports enabling plugins, connecting accounts and installing additional packages from Git. Bundled skill sources and pinned revisions are recorded in [the community source manifest](aionui/resources/ellmsha-skills/community/SOURCES.json).
 
 ## Project status
 
-macOS arm64 packaging, installed launch and chat/memory persistence have been exercised. Release automation targets macOS DMG/ZIP, Windows x64 EXE and Linux VPS container images. Current build, signing and runtime evidence is recorded per release; configured targets are not proof of successful builds or installation tests. Some integration checks require your account or OS permissions.
+| OS | Desktop app | Docker image |
+| --- | --- | --- |
+| macOS | ✅ arm64 / Apple silicon | ✅ Linux amd64 via Docker Desktop; emulated on Apple silicon |
+| Windows | ✅ x64 / x86-64 | ✅ Linux amd64 via Docker Desktop / WSL2 |
+| Linux | ❌ No published desktop package | ✅ amd64 / x86-64, native Docker Engine |
 
-See [the evidence and remaining release checks](docs/release-status.md) before deploying.
+Docker packages are **Linux amd64** images. Other host architectures need [emulation](https://docs.docker.com/build/building/multi-platform/); Linux arm64 images are not currently published. See [releases](https://github.com/ShiftHackZ/ellmsha/releases) for available installers and image versions.
 
 ---
 
