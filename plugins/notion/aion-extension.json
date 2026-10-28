@@ -1,0 +1,33 @@
+{
+  "name": "notion",
+  "version": "1.0.0",
+  "displayName": "Notion",
+  "description": "Independent Notion OAuth accounts and workspaces for pages, databases, search, and comments.",
+  "author": "eLLMsha",
+  "license": "MIT",
+  "homepage": "https://developers.notion.com/guides/mcp/overview",
+  "apiVersion": "1.0.0",
+  "permissions": {
+    "storage": true,
+    "network": {
+      "allowedDomains": [
+        "mcp.notion.com",
+        "notion.com",
+        "www.notion.com"
+      ],
+      "reasoning": "Authorize independent Notion workspace identities and use the official hosted Notion MCP server."
+    },
+    "shell": true,
+    "filesystem": "extension-only",
+    "active_user": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "notion-workspace-work",
+        "description": "Choose the verified Notion account and workspace, discover available tools, and work with pages and databases.",
+        "path": "skills/notion-workspace-work/SKILL.md"
+      }
+    ]
+  }
+}
