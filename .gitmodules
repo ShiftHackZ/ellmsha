@@ -1,27 +1,36 @@
 [submodule "upstream/tencentdb-agent-memory"]
 	path = tencentdb-agent-memory
 	url = https://github.com/ShiftHackZ/ellmsha-TencentDB-Agent-Memory.git
+	branch = ellmsha-main
 [submodule "upstream/aionui"]
 	path = aionui
 	url = https://github.com/ShiftHackZ/ellmsha-AionUi.git
+	branch = ellmsha-main
 [submodule "bmad-method"]
 	path = bmad-method
 	url = https://github.com/ShiftHackZ/ellmsha-BMAD-METHOD.git
+	branch = ellmsha-main
 [submodule "ponytail"]
 	path = ponytail
 	url = https://github.com/ShiftHackZ/ellmsha-ponytail.git
+	branch = ellmsha-main
 [submodule "aioncore"]
 	path = aioncore
 	url = https://github.com/ShiftHackZ/ellmsha-AionCore.git
+	branch = ellmsha-main
 [submodule "aionrs"]
 	path = aionrs
 	url = https://github.com/ShiftHackZ/ellmsha-aionrs.git
+	branch = ellmsha-main
 [submodule "mobile-mcp"]
 	path = mobile-mcp
 	url = https://github.com/ShiftHackZ/ellmsha-mobile-mcp.git
+	branch = ellmsha-main
 [submodule "chrome-devtools-mcp"]
 	path = chrome-devtools-mcp
 	url = https://github.com/ShiftHackZ/ellmsha-chrome-devtools-mcp.git
+	branch = ellmsha-main
 [submodule "open-codex-computer-use"]
 	path = open-codex-computer-use
 	url = https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use.git
+	branch = ellmsha-main
