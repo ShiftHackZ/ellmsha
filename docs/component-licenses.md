@@ -16,6 +16,8 @@ This inventory covers the nine maintained integration forks in this checkout. It
 
 ## Before public distribution
 
+The macOS USB security-key adapter uses normal library dependencies, rather than additional forks: [libfido2 1.17.0](https://github.com/Yubico/libfido2) (BSD-2-Clause), [libcbor 0.14.0](https://github.com/PJK/libcbor) (MIT), and [OpenSSL 3.6.3](https://github.com/openssl/openssl) (Apache-2.0), statically linked into the native addon. Their license texts and `dependencies.lock.json` ship beside `out/main/native/security-key/security-key.node`; the lock records original source URLs/checksums. CMake and pkgconf are checksum-pinned build-only tools and are not runtime dependencies. [tldts 7.0.26](https://github.com/remusao/tldts) (MIT) supplies public-suffix validation and is bundled into the desktop main-process code.
+
 Original root-repository material is licensed under AGPL-3.0-only, with a separate paid commercial option for rights controlled by Moroz Inc.; see [LICENSING.md](../LICENSING.md). Separately licensed components and maintained fork directories retain their own license terms. Preserve all upstream copyright notices and license files. About identifies upstream versions and harness patches, while Git submodule references and the runtime preparers identify exact sources.
 
 Maintained integration commits for root `main` are published on `ellmsha-main` in the nine fork repositories; the root gitlinks pin their exact revisions, including AionRS. Fresh recursive checkout verification is recorded in the release status. This is source publication, not a claim that every platform package has been built.

@@ -27,7 +27,7 @@ eLLMsha brings those pieces into one desktop harness. Use your preferred coding 
 - **Project rules arrive before the task.** A project's remembered rules are loaded before its prompt is executed, including delegated work. Decisions, BMAD specifications and reusable findings stay available when you open a fresh chat or choose another agent.
 - **One product can span several repositories.** Attach the backend, frontend and mobile client to the same project. Memory stays with the project; source indexes and search retain each repository's identity.
 - **Build an agent team on a diagram.** Auto Router separates the root model, default subagents and task classifier. Add model overrides for coding, QA or research, choose a cost/speed/quality priority, and keep independent settings for automatic, semi-automatic and manual modes. Available routes follow each adapter's capabilities.
-- **A desktop browser with project-specific sign-ins.** Real Chromium tabs keep cookies, storage and history separate between projects. Chats within a project share its browser profile; ordinary chats share a separate default profile.
+- **A desktop browser with project-specific sign-ins.** Real Chromium tabs keep cookies, storage and history separate between projects. Chats within a project share its browser profile; ordinary chats share a separate default profile. On macOS, use an existing USB security key to sign in without leaving the workspace; AWS Console sign-in has been confirmed in the installed app.
 - **Useful tools without an enormous starting prompt.** Skills and MCP tools are discovered and loaded as needed. Per-chat and global Usage views expose token consumption and context composition, distinguishing reported counters from estimates or unavailable measurements.
 - **Several work accounts, one workspace.** Connect multiple Linear, Notion and Clockify identities. Agents can use the appropriate account without permanently binding a project folder to it; ambiguous requests require an account choice.
 
@@ -64,6 +64,8 @@ Choose the **macOS Apple silicon DMG** or **Windows x64 EXE** on the [latest rel
 2. Choose an agent and model. For local inference, configure Ollama and download a suitable model.
 3. Open **Settings → Memory** to select the embedding model, and **Settings → Plugins** to connect your work accounts.
 4. Give the agent a task; inspect its tools, delegated work and Usage alongside the conversation.
+
+**USB security-key sign-in on macOS.** Connect a key already registered with the website, start sign-in in an in-app browser tab, and follow eLLMsha's confirmation, PIN and key-touch prompts. Successful AWS Console sign-in was confirmed in the signed local `2026.10.29 Patch 2` build. This integration covers USB keys; Touch ID/iCloud passkeys and new-key registration are outside its scope. Google sign-in with this method has not passed verification; another 2FA method was used successfully. See [browser authentication support and limits](docs/browser-profiles.md#usb-security-key-sign-in-on-macos).
 
 To build from source, clone the exact maintained component revisions:
 
@@ -150,7 +152,7 @@ These four forks form the application itself. We adapt them together so project 
 
 | Component | Role |
 | --- | --- |
-| [AionUI](https://github.com/ShiftHackZ/ellmsha-AionUi/tree/ellmsha-main) | **Desktop and WebUI.** Our changes add project-isolated Chromium tabs, the visual routing editor, Usage dashboards, multi-account plugin settings and bundled service lifecycle management. |
+| [AionUI](https://github.com/ShiftHackZ/ellmsha-AionUi/tree/ellmsha-main) | **Desktop and WebUI.** Our changes add project-isolated Chromium tabs with USB security-key sign-in on macOS, the visual routing editor, Usage dashboards, multi-account plugin settings and bundled service lifecycle management. |
 | [AionCore](https://github.com/ShiftHackZ/ellmsha-AionCore/tree/ellmsha-main) | **Application and agent-session backend.** We added project-rule preflight, on-demand tool discovery, routing and usage plumbing, project-scoped channel sessions, and account-aware integrations. |
 | [AionRS](https://github.com/ShiftHackZ/ellmsha-aionrs/tree/ellmsha-main) | **Native agent engine.** Our integration connects project memory, skill/tool loading and subagent execution to the harness's session and routing policies. |
 | [TencentDB Agent Memory](https://github.com/ShiftHackZ/ellmsha-TencentDB-Agent-Memory/tree/ellmsha-main) | **Persistent memory, Wiki and source indexes.** We added project guidance and searchable workflow artifacts, per-repository indexing, and generation callbacks that use the originating chat's model while embeddings remain independently configured. |

@@ -24,7 +24,7 @@ test('main app and native helper require the exact full certificate, team and st
   const inspect = (_command, args) => ({ status: 0, stdout: '', stderr: args.includes('-r-') ? 'designated => identifier "fixture" and anchor apple generic' : `Authority=${identity}\nTeamIdentifier=ABCDEFGHIJ\n` });
   const inspected = [];
   verifyApplicationSignature(appPath, env, run, (command, args) => { inspected.push(args.at(-1)); return inspect(command, args); });
-  assert.deepEqual([...new Set(inspected)], [appPath, `${appPath}/Contents/Resources/open-computer-use/Open Computer Use.app`]);
+  assert.deepEqual([...new Set(inspected)], [appPath, `${appPath}/Contents/Resources/open-computer-use/Open Computer Use.app`, `${appPath}/Contents/Resources/app.asar.unpacked/out/main/native/security-key/security-key.node`]);
   assert.throws(() => verifyApplicationSignature(appPath, env, run, (command, args) => ({ ...inspect(command, args), stderr: 'Authority=Developer ID Application: Other (ABCDEFGHIJ)\nTeamIdentifier=ABCDEFGHIJ\n' })), /exact selected/);
   assert.throws(() => verifyApplicationSignature(appPath, env, run, (command, args) => args.includes('-r-') ? { status: 0, stdout: 'designated => cdhash H"fixture"', stderr: '' } : inspect(command, args)), /stable certificate/);
 });
