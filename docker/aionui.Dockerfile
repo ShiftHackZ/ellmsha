@@ -103,6 +103,7 @@ COPY --from=mobile-mcp /src/mobile-mcp/package-lock.json ./mobile-mcp/package-lo
 COPY --from=mobile-mcp /src/mobile-mcp/LICENSE ./mobile-mcp/LICENSE
 COPY --from=open-computer-use /runtime ./open-computer-use
 COPY plugins/ ./plugins/
+RUN test -s plugins/figma/aion-extension.json && test -s plugins/figma/skills/figma-design-work/SKILL.md
 COPY bmad-method/ellmsha-skills/ ./global-skills/bmad/
 COPY ponytail/skills/ ./global-skills/ponytail/
 COPY aionui/resources/ellmsha-skills/ ./global-skills/ellmsha/

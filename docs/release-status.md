@@ -1,3 +1,7 @@
+## Figma release preparation — 2026-11-02 Patch 3
+
+The user confirmed the installed Figma plugin works and authorized its official icon correction, integration into main and publication. Candidate 2026.11.02-patch.3 uses UI Patch 33 and Core Patch 24 and includes the previously approved Windows archive-path and installer-filename repairs. Patch 1 verification was cancelled at the user’s request; no Patch 1 release was published. Patch 2 was installed locally and preserved all 351 original chats and 41,383 messages; it was not published. Patch 3 hosted verification and publication are pending. [Release notes](releases/2026.11.02-patch.3.md).
+
 # Release readiness — 2026-10-22
 
 This ledger tracks the [2026-10-22 Patch 1 candidate](releases/2026.10.22-patch.1.md), public and installed [v2026.10.14 Patch 11](releases/2026.10.14-patch.11.md), preceding public [v2026.10.14 Patch 10](https://github.com/ShiftHackZ/ellmsha/releases/tag/v2026.10.14-patch.10), the previous [v2026.10.13 Patch 9](releases/2026.10.13-patch.9.md) installation and earlier milestones. Patch 8 and Patch 9 were not published as separate binary releases. [v2026.10.13 Patch 7](releases/2026.10.13-patch.7.md) artifacts also remain available on GitHub.

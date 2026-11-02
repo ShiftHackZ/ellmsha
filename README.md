@@ -30,7 +30,7 @@ eLLMsha brings those pieces into one desktop harness. Use your preferred coding 
 - **A desktop browser with project-specific sign-ins.** Real Chromium tabs keep cookies, storage and history separate between projects. Chats within a project share its browser profile; ordinary chats share a separate default profile. On macOS, use an existing USB security key to sign in without leaving the workspace; AWS Console sign-in has been confirmed in the installed app.
 - **A terminal shared with your agent.** Open an interactive terminal tab in the project or temporary chat workspace. You and the agent use the same shell, with live output, full-screen commands, keyboard input and Ctrl+C. Desktop sessions run locally; WebUI sessions run on the server, inside the container for Docker deployments. Closing a session stops its owned processes.
 - **Useful tools without an enormous starting prompt.** Skills and MCP tools are discovered and loaded as needed. Per-chat and global Usage views expose token consumption and context composition, distinguishing reported counters from estimates or unavailable measurements.
-- **Several work accounts, one workspace.** Connect multiple Linear, Notion and Clockify identities. Agents can use the appropriate account without permanently binding a project folder to it; ambiguous requests require an account choice.
+- **Several work accounts, one workspace.** Connect multiple Linear, Notion, Clockify and Figma identities. Agents can use the appropriate account without permanently binding a project folder to it; ambiguous requests require an account choice.
 
 **The desktop bundles its backend, memory services and their runtime.** No Docker setup is needed for desktop memory. Cloud/API models, installed coding agents and local Ollama models use the same project workspace.
 
@@ -173,6 +173,7 @@ These are shipped alongside the core as skills, plugins or tool runtimes. Servic
 | [Open Computer Use](https://github.com/ShiftHackZ/ellmsha-open-codex-computer-use/tree/ellmsha-main) | **Bundled plugin + native MCP runtime** — operate desktop applications through their accessibility interfaces. |
 | [Linear](plugins/linear) | **eLLMsha plugin + skill** — multiple OAuth accounts, issues, projects, comments and attachments through Linear's hosted MCP. |
 | [Notion](plugins/notion) | **eLLMsha plugin + skill** — multiple OAuth identities/workspaces for pages, databases, search and comments through Notion's hosted MCP. |
+| [Figma](plugins/figma) | **eLLMsha plugin + skill** — independent token accounts, design inspection, image exports, folders and authorized comments; private browser-assisted token import on desktop. |
 | [Clockify](plugins/clockify) | **eLLMsha plugin + skill** — independent API-key accounts, time reports and approval-gated time-entry changes. |
 | [Plugin Authoring](plugins/plugin-dev) | **eLLMsha plugin + skill/templates** — create, validate and install compatible plugin packages, including selected Git subdirectories. |
 | [Copilot IDE bridge](scripts/copilot-ide/PROVIDER.md) | **Bundled desktop provider/runtime** — use Copilot models through an isolated, lazily started Code OSS extension host with persistent sign-in. GitHub account and organization access policies still apply. |
