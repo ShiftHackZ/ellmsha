@@ -24,6 +24,14 @@ Use the planning workflows when a task needs requirements, architecture, stories
 
 A practical sequence is **requirements → architecture → bounded story → implementation → focused tests → read-only review → native acceptance**. Test results are evidence for the paths tested, not proof of the entire product.
 
+## Keep previews and development servers visible
+
+Open file tabs refresh when an agent changes their source, including BMAD documents stored in project memory. Refresh preserves the selected tab and does not overwrite an unsaved edit. The toolbar button immediately left of the Files toggle hides or shows the preview panel without closing its tabs.
+
+Ask the agent to start development servers through the background terminal tools. Each process gets a terminal tab alongside files and browser tabs, with output and **Stop process**. Closing a terminal stops its owned process before removing the tab. Hiding the panel keeps the process running for review. App-owned servers shut down when the desktop exits, including when its parent process is killed; commands must stay in the foreground rather than detach or daemonize. Processes started separately outside these tools are not adopted.
+
+**Settings → Memory** separates **Memory Hub** from **Memory embeddings**. Switching tabs keeps the embedded panel and any unfinished embedding form intact. A new-version icon appears beside **Settings**, or to the right of the theme switch inside Settings, only after an update is available.
+
 ## Delegate with a clear boundary
 
 Give each child an objective, relevant workspace and output contract. Let it retrieve needed durable context. Ask for exact paths and verified outcomes. A parent waiting for a child is still working; a finished parent with an independently running child is a different state. Use both the chat indicator and the child history when diagnosing activity.

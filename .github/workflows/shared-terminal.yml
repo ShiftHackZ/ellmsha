@@ -1,0 +1,28 @@
+name: Shared terminal
+on:
+  pull_request:
+    paths: ['aioncore', 'aionui', 'aionrs', 'aioncore/**', 'aionui/**', 'aionrs/**', 'docker/aionui.Dockerfile', '.github/workflows/shared-terminal.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-pty:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Select pinned Rust
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup default 1.95.0
+      - name: Verify real PTYs and shared session lifecycle
+        working-directory: aioncore
+        run: cargo test --locked -p aionui-shell --test shared_terminal --test background_process
