@@ -1,6 +1,20 @@
 # Build the checked-out forks so Docker and desktop contain the same changes.
 FROM node:22.20.0-bookworm-slim AS node-base
 
+# Agent MCP helpers use Core's pinned managed Node layout, including offline
+# activation in bundled mode. A system Node executable alone is insufficient.
+FROM node:24.11.0-bookworm-slim AS terminal-node
+ARG TARGETARCH
+RUN case "$TARGETARCH" in amd64) terminal_arch=x64 ;; arm64) terminal_arch=arm64 ;; *) exit 1 ;; esac \
+    && terminal_root="/runtime/node/node-v24.11.0-linux-$terminal_arch" \
+    && mkdir -p "$terminal_root/bin" "$terminal_root/lib/node_modules" \
+    && cp /usr/local/bin/node "$terminal_root/bin/node" \
+    && cp -a /usr/local/lib/node_modules/npm "$terminal_root/lib/node_modules/npm" \
+    && cp /usr/local/LICENSE "$terminal_root/LICENSE" \
+    && ln -s ../lib/node_modules/npm/bin/npm-cli.js "$terminal_root/bin/npm" \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js "$terminal_root/bin/npx" \
+    && "$terminal_root/bin/node" --version | grep -Fx 'v24.11.0'
+
 FROM node-base AS chrome-devtools-mcp
 WORKDIR /src/chrome-devtools-mcp
 COPY scripts/prepare-chrome-devtools-mcp.js /tmp/prepare-chrome-devtools-mcp.js
@@ -67,15 +81,17 @@ RUN case "$TARGETARCH" in amd64|arm64) ;; *) echo "Unsupported Open Computer Use
     && /runtime/open-computer-use --version | grep -Fx '0.3.6'
 
 FROM node:22.20.0-bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libicu-dev python3 python3-gi gir1.2-atspi-2.0 gir1.2-gtk-3.0 \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libicu-dev ncurses-term procps python3 python3-gi gir1.2-atspi-2.0 gir1.2-gtk-3.0 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/ellmsha
 COPY LICENSE /usr/share/licenses/ellmsha/LICENSE
 COPY --from=backend /src/aioncore/target/release/aioncore ./aioncore
+COPY --from=terminal-node /runtime/node ./managed-resources/node
 COPY --from=frontend /src/aionui-web ./aionui-web
 COPY --from=frontend /src/aionui/out/renderer ./static
 COPY --from=frontend /src/aionui/out/main/builtin-mcp-tencent-memory.js ./mcp/builtin-mcp-tencent-memory.js
 COPY --from=frontend /src/aionui/out/main/builtin-mcp-chat-history.js ./mcp/builtin-mcp-chat-history.js
+COPY --from=frontend /src/aionui/out/main/builtin-mcp-background-processes.js ./mcp/builtin-mcp-background-processes.js
 COPY --from=frontend /src/aionui/out/main/builtin-mcp-browser.js ./mcp/builtin-mcp-browser.js
 COPY --from=frontend /src/aionui/out/main/builtin-mcp-chrome-devtools.js ./mcp/builtin-mcp-chrome-devtools.js
 COPY --from=frontend /src/aionui/out/main/chrome-devtools-mcp ./mcp/chrome-devtools-mcp

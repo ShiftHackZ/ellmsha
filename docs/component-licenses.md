@@ -14,6 +14,8 @@ This inventory covers the nine maintained integration forks in this checkout. It
 | [Chrome DevTools MCP](../chrome-devtools-mcp/README.md) | [LICENSE](../chrome-devtools-mcp/LICENSE) | Apache-2.0 |
 | [Open Computer Use](../open-codex-computer-use/README.md) | [LICENSE](../open-codex-computer-use/LICENSE) | MIT |
 
+The shared terminal uses xterm.js 5.5.0 and its Fit addon 0.10.0 (MIT), portable-pty 0.9.0 (MIT), and vt100 0.16.2 (MIT). Their copyright/license texts are preserved in the production renderer's `terminal-licenses.txt`, included by both desktop and Docker builds.
+
 ## Before public distribution
 
 The macOS USB security-key adapter uses normal library dependencies, rather than additional forks: [libfido2 1.17.0](https://github.com/Yubico/libfido2) (BSD-2-Clause), [libcbor 0.14.0](https://github.com/PJK/libcbor) (MIT), and [OpenSSL 3.6.3](https://github.com/openssl/openssl) (Apache-2.0), statically linked into the native addon. Their license texts and `dependencies.lock.json` ship beside `out/main/native/security-key/security-key.node`; the lock records original source URLs/checksums. CMake and pkgconf are checksum-pinned build-only tools and are not runtime dependencies. [tldts 7.0.26](https://github.com/remusao/tldts) (MIT) supplies public-suffix validation and is bundled into the desktop main-process code.

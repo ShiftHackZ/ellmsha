@@ -99,3 +99,15 @@ test('parallel image builds cannot publish; tested bytes transfer only for gated
   let previous = -1;
   for (const command of order) { const current = publish.indexOf(command); assert.ok(current > previous, `${command} must follow its prerequisite`); previous = current; }
 });
+
+
+test('the container runtime includes the background terminal MCP bundle', () => {
+  const docker = readFileSync(new URL('../../docker/aionui.Dockerfile', import.meta.url), 'utf8');
+  assert.match(docker, /^COPY --from=frontend \/src\/aionui\/out\/main\/builtin-mcp-background-processes\.js \.\/mcp\/builtin-mcp-background-processes\.js$/m);
+});
+
+test('Docker includes the pinned managed Node layout needed by shared terminal MCP helpers', () => {
+  const source=readFileSync(new URL('../../docker/aionui.Dockerfile',import.meta.url),'utf8');
+  assert.match(source,/FROM node:24\.11\.0-bookworm-slim AS terminal-node/);
+  assert.match(source,/COPY --from=terminal-node \/runtime\/node \.\/managed-resources\/node/);
+});
