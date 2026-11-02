@@ -1,0 +1,33 @@
+{
+  "name": "figma",
+  "version": "1.0.0",
+  "displayName": "Figma",
+  "description": "Independent Figma accounts for design inspection, image exports, folders and approval-gated comments using personal access tokens.",
+  "permissions": {
+    "storage": true,
+    "network": {
+      "allowedDomains": [
+        "api.figma.com",
+        "www.figma.com",
+        "figma.com"
+      ],
+      "reasoning": "Verify the selected Figma identity and use its authorized design, folder and comment APIs."
+    },
+    "shell": false,
+    "filesystem": "extension-only",
+    "active_user": true
+  },
+  "contributes": {
+    "skills": [
+      {
+        "name": "figma-design-work",
+        "description": "Connect Figma accounts, inspect designs and exports, browse folders and manage authorized comments.",
+        "path": "skills/figma-design-work/SKILL.md"
+      }
+    ]
+  },
+  "author": "eLLMsha",
+  "license": "MIT",
+  "homepage": "https://developers.figma.com/docs/rest-api/",
+  "apiVersion": "1.0.0"
+}
