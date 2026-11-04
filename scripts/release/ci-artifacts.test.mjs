@@ -65,7 +65,10 @@ for (const [platform, target, extensions] of [['darwin', 'mac-arm64', ['dmg', 'z
     const version = '2026.01.02-patch.3';
     const data = Buffer.from('synthetic signed installer bytes');
     try {
-      for (const extension of extensions) await writeFile(path.join(temp, `eLLMsha-2026.1.2-patch.3-${target}.${extension}`), data);
+      for (const extension of extensions) {
+        const nativeTarget = platform === 'linux' ? `linux-${extension === 'flatpak' ? 'x86_64' : 'amd64'}` : target;
+        await writeFile(path.join(temp, `eLLMsha-2026.1.2-patch.3-${nativeTarget}.${extension}`), data);
+      }
       await verifyArtifacts({ directory: temp, version, platform, arch: target.endsWith('arm64') ? 'arm64' : 'x64' });
       for (const extension of extensions) assert.deepEqual(await readFile(path.join(temp, `eLLMsha-${version}-${target}.${extension}`)), data);
       const checksum = await readFile(path.join(temp, `SHA256SUMS-${target}.txt`), 'utf8');
@@ -98,7 +101,7 @@ for (const linuxPackages of ['flatpak', 'deb']) {
     const sourceFile = path.join(temp, 'source.json');
     const output = path.join(temp, 'staged');
     const data = Buffer.from(`synthetic ${linuxPackages} bytes`);
-    const nativeName = `eLLMsha-2026.11.4-patch.1-linux-x64.${linuxPackages}`;
+    const nativeName = `eLLMsha-2026.11.4-patch.1-linux-${linuxPackages === 'flatpak' ? 'x86_64' : 'amd64'}.${linuxPackages}`;
     const publicName = `eLLMsha-${source.version}-linux-x64.${linuxPackages}`;
     try {
       await writeFile(sourceFile, JSON.stringify(source));
@@ -118,3 +121,21 @@ for (const linuxPackages of ['flatpak', 'deb']) {
     } finally { await rm(temp, { recursive: true, force: true }); }
   });
 }
+
+test('Linux architecture normalization works without date padding and never overwrites public bytes', async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'ellmsha-linux-arch-'));
+  const version = '2026.11.13-patch.1';
+  try {
+    for (const [arch, extension, nativeArch] of [['x64', 'flatpak', 'x86_64'], ['x64', 'deb', 'amd64'], ['arm64', 'flatpak', 'aarch64']]) {
+      const nativeName = path.join(temp, `eLLMsha-${version}-linux-${nativeArch}.${extension}`);
+      const publicName = path.join(temp, `eLLMsha-${version}-linux-${arch}.${extension}`);
+      const input = { directory: temp, version, platform: 'linux', arch, linuxPackages: extension };
+      await writeFile(nativeName, 'original package bytes');
+      await verifyArtifacts(input);
+      assert.equal(await readFile(publicName, 'utf8'), 'original package bytes');
+      await writeFile(nativeName, 'different package bytes');
+      await assert.rejects(() => verifyArtifacts(input), /refusing to overwrite/);
+      assert.equal(await readFile(publicName, 'utf8'), 'original package bytes');
+    }
+  } finally { await rm(temp, { recursive: true, force: true }); }
+});

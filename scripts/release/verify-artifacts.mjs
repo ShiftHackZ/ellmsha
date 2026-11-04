@@ -25,7 +25,12 @@ export async function verifyArtifacts({ directory, version, platform = process.p
   for (const extension of extensions) {
     const name = `eLLMsha-${version}-${os}-${arch}.${extension}`;
     const artifact = path.join(directory, name);
-    const native = path.join(directory, `eLLMsha-${nativeVersion}-${os}-${arch}.${extension}`);
+    // electron-builder's Linux targets use distribution-specific architecture names.
+    const nativeArch = {
+      flatpak: { x64: 'x86_64', arm64: 'aarch64', ia32: 'i386', armv7l: 'arm' },
+      deb: { x64: 'amd64', ia32: 'i386' },
+    }[extension]?.[arch] ?? arch;
+    const native = path.join(directory, `eLLMsha-${nativeVersion}-${os}-${nativeArch}.${extension}`);
     if (native !== artifact && await exists(native)) {
       if (await exists(artifact)) throw new Error(`Ambiguous installer names; refusing to overwrite: ${name}`);
       await rename(native, artifact);
