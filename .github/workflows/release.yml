@@ -1,20 +1,35 @@
 name: Release installers and VPS images
 
 on:
+  push:
+    tags: ['v*-patch.*']
   workflow_dispatch:
     inputs:
-      desktop:
-        description: 'Build signed/notarized macOS and unsigned Windows installers.'
+      macos:
+        description: 'Build signed/notarized macOS arm64 installers.'
         type: boolean
         default: true
+      windows:
+        description: 'Build the unsigned Windows x64 installer.'
+        type: boolean
+        default: true
+      linux:
+        description: 'Build unsigned Linux x64 desktop packages.'
+        type: boolean
+        default: true
+      linux_packages:
+        description: 'Linux formats for manual verification; publication requires all.'
+        type: choice
+        options: [all, flatpak, deb]
+        default: all
       docker:
         description: 'Build and smoke-test all Linux VPS images.'
         type: boolean
         default: true
       publish:
-        description: 'Publish from the matching release tag. Requires desktop=true and docker=true.'
+        description: 'Publish from the matching tag. Requires all four platforms and all Linux formats.'
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: read
@@ -26,13 +41,18 @@ concurrency:
 jobs:
   preflight:
     runs-on: ubuntu-24.04
-    environment: release
+    environment: ${{ (github.event_name == 'push' || inputs.macos || inputs.publish) && 'release' || 'ci' }}
     outputs:
       version: ${{ steps.source.outputs.version }}
       tag: ${{ steps.source.outputs.tag }}
       source_ref: ${{ steps.source.outputs.source_ref }}
       publish: ${{ steps.source.outputs.publish }}
       desktop: ${{ steps.source.outputs.desktop }}
+      desktop_matrix: ${{ steps.source.outputs.desktop_matrix }}
+      macos: ${{ steps.source.outputs.macos }}
+      windows: ${{ steps.source.outputs.windows }}
+      linux: ${{ steps.source.outputs.linux }}
+      linux_packages: ${{ steps.source.outputs.linux_packages }}
       docker: ${{ steps.source.outputs.docker }}
     steps:
       - name: Preserve source bytes
@@ -51,7 +71,10 @@ jobs:
         id: source
         env:
           RELEASE_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
-          RELEASE_BUILD_DESKTOP: ${{ github.event_name == 'push' || inputs.desktop }}
+          RELEASE_BUILD_MACOS: ${{ github.event_name == 'push' || inputs.macos }}
+          RELEASE_BUILD_WINDOWS: ${{ github.event_name == 'push' || inputs.windows }}
+          RELEASE_BUILD_LINUX: ${{ github.event_name == 'push' || inputs.linux }}
+          RELEASE_LINUX_PACKAGES: ${{ github.event_name == 'push' && 'all' || inputs.linux_packages }}
           RELEASE_BUILD_DOCKER: ${{ github.event_name == 'push' || inputs.docker }}
           REQUIRE_SIGNING_SECRETS: 'true'
           MAC_SIGNING_READY: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' && secrets.MAC_SIGNING_IDENTITY != '' && secrets.MAC_TEAM_ID != '' && secrets.MAC_NOTARY_APPLE_ID != '' && secrets.MAC_NOTARY_APP_PASSWORD != '' }}
@@ -69,16 +92,7 @@ jobs:
     environment: ${{ matrix.environment }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: macos-15
-            target: mac-arm64
-            signing: signed + notarized
-            environment: release
-          - os: windows-2022
-            target: win-x64
-            signing: unsigned
-            environment: ci
+      matrix: ${{ fromJSON(needs.preflight.outputs.desktop_matrix) }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     defaults:
@@ -94,7 +108,10 @@ jobs:
       ELLM_SHA_CARGO_HOME: ${{ github.workspace }}/.data/cargo
       RELEASE_SOURCE_REF: ${{ needs.preflight.outputs.source_ref }}
       RELEASE_PUBLISH: ${{ needs.preflight.outputs.publish }}
-      RELEASE_BUILD_DESKTOP: ${{ needs.preflight.outputs.desktop }}
+      RELEASE_BUILD_MACOS: ${{ needs.preflight.outputs.macos }}
+      RELEASE_BUILD_WINDOWS: ${{ needs.preflight.outputs.windows }}
+      RELEASE_BUILD_LINUX: ${{ needs.preflight.outputs.linux }}
+      RELEASE_LINUX_PACKAGES: ${{ needs.preflight.outputs.linux_packages }}
       RELEASE_BUILD_DOCKER: ${{ needs.preflight.outputs.docker }}
       RELEASE_TARGET: ${{ matrix.target }}
     steps:
@@ -113,7 +130,7 @@ jobs:
         with:
           bun-version: '1.3.9'
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        if: runner.os == 'Windows'
+        if: runner.os != 'macOS'
         with:
           go-version: '1.22.12'
           cache: false
@@ -132,7 +149,7 @@ jobs:
           rustup run 1.95.0 rustc --version
       - name: Configure ephemeral build paths
         run: |
-          node -e "const fs=require('node:fs'),p=require('node:path');for(const [k,v] of Object.entries({BUN_INSTALL_CACHE_DIR:'bun-cache',NPM_CONFIG_CACHE:'npm-cache',ELECTRON_CACHE:'electron-cache',ELECTRON_BUILDER_CACHE:'electron-builder-cache',RELEASE_SOURCE_MANIFEST:'source-manifest.json',RELEASE_STAGE_DIR:'release-installers'}))fs.appendFileSync(process.env.GITHUB_ENV,k+'='+p.join(process.env.RUNNER_TEMP,v)+'\n')"
+          node -e "const fs=require('node:fs'),p=require('node:path');for(const [k,v] of Object.entries({BUN_INSTALL_CACHE_DIR:'bun-cache',NPM_CONFIG_CACHE:'npm-cache',ELECTRON_CACHE:'electron-cache',ELECTRON_BUILDER_CACHE:'electron-builder-cache',GOCACHE:'go-cache',GOMODCACHE:'go-mod-cache',FLATPAK_USER_DIR:'flatpak-user',RELEASE_SOURCE_MANIFEST:'source-manifest.json',RELEASE_STAGE_DIR:'release-installers'}))fs.appendFileSync(process.env.GITHUB_ENV,k+'='+p.join(process.env.RUNNER_TEMP,v)+'\n')"
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         id: desktop-cache
         with:
@@ -144,14 +161,35 @@ jobs:
             ${{ runner.temp }}/npm-cache
             ${{ runner.temp }}/electron-cache
             ${{ runner.temp }}/electron-builder-cache
+            ${{ runner.temp }}/go-cache
+            ${{ runner.temp }}/go-mod-cache
           key: desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-${{ needs.preflight.outputs.source_ref }}
           restore-keys: |
             desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-
             desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        if: runner.os == 'Linux' && needs.preflight.outputs.linux_packages != 'deb'
+        id: flatpak-cache
+        with:
+          path: ${{ runner.temp }}/flatpak-user
+          key: flatpak-ubuntu24.04-x64-${{ hashFiles('aionui/packages/desktop/electron-builder.yml', 'scripts/release/flatpak-preflight.mjs') }}-${{ needs.preflight.outputs.source_ref }}
+          restore-keys: |
+            flatpak-ubuntu24.04-x64-${{ hashFiles('aionui/packages/desktop/electron-builder.yml', 'scripts/release/flatpak-preflight.mjs') }}-
       - name: Record exact checkout provenance
         run: node scripts/release/ci-preflight.mjs
+      - name: Install Linux native build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends build-essential cmake pkg-config libssl-dev
+          if [ "$RELEASE_LINUX_PACKAGES" != deb ]; then
+            sudo apt-get install --yes --no-install-recommends flatpak flatpak-builder dbus-x11
+          fi
       - name: Install locked dependencies
         uses: ./.github/actions/install-desktop-dependencies
+      - name: Prepare configured Flatpak runtimes and verify sandbox
+        if: runner.os == 'Linux' && needs.preflight.outputs.linux_packages != 'deb'
+        run: dbus-run-session -- node scripts/release/flatpak-preflight.mjs --install
       - name: Prepare ephemeral Developer ID keychain and notarization
         if: runner.os == 'macOS'
         env:
@@ -176,6 +214,16 @@ jobs:
           node -e "require('./scripts/run-build-command').runBuildCommand('npm', ['--version'], {stdio:'inherit'})"
           node scripts/release/build.mjs --unsigned
           echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
+      - name: Build Linux x86_64 desktop packages
+        if: runner.os == 'Linux'
+        run: |
+          test "$(node -p process.arch)" = x64
+          if [ "$RELEASE_LINUX_PACKAGES" = deb ]; then
+            node scripts/release/build.mjs --unsigned
+          else
+            dbus-run-session -- node scripts/release/build.mjs --unsigned
+          fi
+          echo 'RELEASE_SIGNING=unsigned' >> "$GITHUB_ENV"
       - name: Verify all installers and stage exact public files
         run: |
           node scripts/release/verify-artifacts.mjs
@@ -198,7 +246,15 @@ jobs:
             ${{ runner.temp }}/npm-cache
             ${{ runner.temp }}/electron-cache
             ${{ runner.temp }}/electron-builder-cache
+            ${{ runner.temp }}/go-cache
+            ${{ runner.temp }}/go-mod-cache
           key: ${{ steps.desktop-cache.outputs.cache-primary-key }}
+      - name: Retain Flatpak runtime cache after packaging failure
+        if: ${{ !cancelled() && steps.flatpak-cache.outputs.cache-primary-key != '' && steps.flatpak-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ${{ runner.temp }}/flatpak-user
+          key: ${{ steps.flatpak-cache.outputs.cache-primary-key }}
       - name: Remove temporary signing material
         if: always() && runner.os == 'macOS'
         run: node scripts/release/ci-macos-signing.mjs cleanup

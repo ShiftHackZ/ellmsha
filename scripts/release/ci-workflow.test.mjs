@@ -6,7 +6,7 @@ const workflow = readFileSync(new URL('../../.github/workflows/release.yml', imp
 const imageWorkflow = readFileSync(new URL('../../.github/workflows/docker-images.yml', import.meta.url), 'utf8');
 test('release credentials and publication are unavailable to pull-request workflows', () => {
   assert.doesNotMatch(workflow, /pull_request|workflow_run|secrets:\s*inherit/);
-  assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?default: true/);
+  assert.match(workflow, /workflow_dispatch:[\s\S]*?publish:[\s\S]*?default: false/);
   assert.match(workflow, /publish:\n\s+needs: \[preflight, desktop, images\]\n\s+if: needs\.preflight\.outputs\.publish == 'true'/);
   assert.match(workflow, /group: official-release-publication\n\s+cancel-in-progress: false/);
   assert.match(workflow, /Remove temporary signing material\n\s+if: always\(\)/);
@@ -41,12 +41,11 @@ test('desktop packaging has a bounded heap inherited by its Node subprocesses', 
 
 test('signed verification wires the same signing lifecycle without enabling publication', () => {
   assert.doesNotMatch(workflow, /sign_macos|WINDOWS_SIGNING_ENABLED|WINDOWS_CERTIFICATE|WIN_CSC|Authenticode/);
-  assert.match(workflow, /preflight:\n\s+runs-on: ubuntu-24.04\n\s+environment: release/);
+  assert.match(workflow, /preflight:\n\s+runs-on: ubuntu-24.04\n\s+environment: \$\{\{ \(github.event_name == 'push' \|\| inputs.macos \|\| inputs.publish\) && 'release' \|\| 'ci' \}\}/);
   assert.match(workflow, /REQUIRE_SIGNING_SECRETS: 'true'/);
   const readiness = workflow.match(/MAC_SIGNING_READY: (.+)/)[1];
   for (const secret of ['MAC_CERTIFICATE_P12_BASE64', 'MAC_CERTIFICATE_PASSWORD', 'MAC_SIGNING_IDENTITY', 'MAC_TEAM_ID', 'MAC_NOTARY_APPLE_ID', 'MAC_NOTARY_APP_PASSWORD']) assert.ok(readiness.includes(`secrets.${secret} != ''`));
-  assert.match(workflow, /target: mac-arm64\n\s+signing: signed \+ notarized\n\s+environment: release/);
-  assert.match(workflow, /target: win-x64\n\s+signing: unsigned\n\s+environment: ci/);
+  assert.match(workflow, /matrix: \$\{\{ fromJSON\(needs.preflight.outputs.desktop_matrix\) \}\}/);
   assert.match(workflow, /name: \$\{\{ matrix.target \}\} \(\$\{\{ matrix.signing \}\}; \$\{\{ needs.preflight.outputs.publish == 'true' && 'release' \|\| 'verification' \}\}\)/);
   assert.match(workflow, /Prepare ephemeral Developer ID keychain and notarization\n\s+if: runner.os == 'macOS'\n/);
   const macBuild = workflow.split('name: Build macOS installers\n')[1].split('\n      - ')[0];
@@ -71,21 +70,49 @@ test('failed packaging retains the same non-secret cache paths without saving ca
   assert.match(restore, /restore-keys: \|[\s\S]*\n            desktop-\$\{\{ matrix.target \}\}-rust1\.95\.0-node24\.11\.0-bun1\.3\.9-\n?$/);
 });
 
-test('desktop and docker verification run independently after preflight with explicit default-on flags', () => {
-  for (const flag of ['desktop', 'docker']) {
+test('macOS, Windows, Linux and Docker have independent default-on dispatch flags', () => {
+  for (const flag of ['macos', 'windows', 'linux', 'docker']) {
     assert.match(workflow, new RegExp(`      ${flag}:\\n        description: [^\\n]+\\n        type: boolean\\n        default: true`));
     assert.ok(workflow.includes(`RELEASE_BUILD_${flag.toUpperCase()}: \${{ github.event_name == 'push' || inputs.${flag} }}`));
     assert.ok(workflow.includes(`${flag}: \${{ steps.source.outputs.${flag} }}`));
   }
   assert.match(workflow, /desktop:\n    needs: preflight\n    if: needs\.preflight\.outputs\.desktop == 'true'/);
+  assert.match(workflow, /desktop_matrix: \$\{\{ steps.source.outputs.desktop_matrix \}\}/);
+  assert.match(workflow, /linux_packages:\n        description: [^\n]+\n        type: choice\n        options: \[all, flatpak, deb\]\n        default: all/);
+  assert.match(workflow, /RELEASE_LINUX_PACKAGES: \$\{\{ github.event_name == 'push' && 'all' \|\| inputs.linux_packages \}\}/);
+  assert.match(workflow, /RELEASE_LINUX_PACKAGES: \$\{\{ needs.preflight.outputs.linux_packages \}\}/);
   assert.match(workflow, /images:\n    needs: preflight\n    if: needs\.preflight\.outputs\.docker == 'true'/);
   assert.match(workflow, /publish:\n    needs: \[preflight, desktop, images\]\n    if: needs\.preflight\.outputs\.publish == 'true'/);
 });
 
-test('one manually started release checks full source history before expensive compilation', () => {
-  assert.doesNotMatch(workflow, /\n  push:\n/);
+test('release tags trigger all-platform publication; dispatch also checks full source history', () => {
+  assert.match(workflow, /\n  push:\n    tags: \['v\*-patch\.\*'\]/);
+  assert.match(workflow, /RELEASE_PUBLISH: \$\{\{ github.event_name == 'push' \|\| inputs.publish \}\}/);
   assert.match(workflow, /submodules: recursive\n\s+fetch-depth: 0/);
   assert.ok(workflow.indexOf('name: Verify maintained native fork source pins') < workflow.indexOf('\n  desktop:\n'));
+});
+
+test('Linux installs native tools and configured Flatpak SDKs before compiling; cached SDKs stay isolated', () => {
+  const linuxDeps = workflow.split('name: Install Linux native build dependencies\n')[1].split('\n      - ')[0];
+  assert.match(linuxDeps, /if: runner.os == 'Linux'/);
+  assert.match(linuxDeps, /build-essential cmake pkg-config libssl-dev/);
+  assert.match(linuxDeps, /if \[ "\$RELEASE_LINUX_PACKAGES" != deb \]/);
+  assert.match(linuxDeps, /flatpak flatpak-builder dbus-x11/);
+  assert.match(workflow, /uses: actions\/setup-go@[^\n]+\n        if: runner.os != 'macOS'/);
+  const order = ['id: flatpak-cache', 'name: Install Linux native build dependencies', 'name: Install locked dependencies', 'name: Prepare configured Flatpak runtimes and verify sandbox', 'name: Build Linux x86_64 desktop packages'];
+  let previous = -1;
+  for (const name of order) { const current = workflow.indexOf(name); assert.ok(current > previous, name); previous = current; }
+  assert.match(workflow, /Prepare configured Flatpak runtimes and verify sandbox\n        if: runner.os == 'Linux' && needs.preflight.outputs.linux_packages != 'deb'\n        run: dbus-run-session -- node scripts\/release\/flatpak-preflight.mjs --install/);
+  assert.match(workflow, /FLATPAK_USER_DIR:'flatpak-user'/);
+  const restore = workflow.split('id: flatpak-cache\n')[1].split('\n      - ')[0];
+  const save = workflow.split('name: Retain Flatpak runtime cache after packaging failure\n')[1].split('\n      - ')[0];
+  for (const step of [restore, save]) assert.match(step, /path: \$\{\{ runner.temp \}\}\/flatpak-user/);
+  assert.match(restore, /key: flatpak-ubuntu24.04-x64-[^\n]+needs.preflight.outputs.source_ref/);
+  assert.match(save, /!cancelled\(\).*steps.flatpak-cache.outputs.cache-hit != 'true'/);
+  assert.match(save, /key: \$\{\{ steps.flatpak-cache.outputs.cache-primary-key \}\}/);
+  const build = workflow.split('name: Build Linux x86_64 desktop packages\n')[1].split('\n      - ')[0];
+  assert.match(build, /node scripts\/release\/build.mjs --unsigned/);
+  assert.match(build, /if \[ "\$RELEASE_LINUX_PACKAGES" = deb \]; then\n\s+node scripts\/release\/build.mjs --unsigned\n\s+else\n\s+dbus-run-session -- node scripts\/release\/build.mjs --unsigned/);
 });
 
 test('parallel image builds cannot publish; tested bytes transfer only for gated full publication', () => {

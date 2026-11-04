@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { compareReleaseTags, publishRelease } from './ci-publish.mjs';
@@ -14,7 +14,7 @@ test('publication resumes only an exact-source draft and never overwrites a publ
   const sourceFile = path.join(temp, 'source.json'), directory = path.join(temp, 'staged');
   try {
     await writeFile(sourceFile, JSON.stringify(source));
-    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'] })) {
+    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': ['flatpak', 'deb'] })) {
       const sums = [];
       for (const extension of extensions) {
         const name = `eLLMsha-${source.version}-${target}.${extension}`, content = `fixture ${name}`;
@@ -34,9 +34,18 @@ test('publication resumes only an exact-source draft and never overwrites a publ
     const calls = [];
     const run = (args) => { calls.push(args); return args[0] === 'api' ? args[1].endsWith('/latest') ? latest && JSON.stringify(latest) : existing && JSON.stringify(existing) : ''; };
     const opts = { source, directory, notes: path.join(temp, 'notes.md'), run };
+    const linuxSumsPath = path.join(directory, 'SHA256SUMS-linux-x64.txt');
+    const linuxSums = await readFile(linuxSumsPath, 'utf8');
+    await writeFile(linuxSumsPath, linuxSums.split('\n')[0]);
+    await assert.rejects(() => publishRelease(opts), /incomplete/);
+    assert.equal(calls.length, 0);
+    await writeFile(linuxSumsPath, linuxSums);
     assert.match(await publishRelease(opts), /v2026\.10\.13-patch\.10$/);
     assert.ok(calls[2].includes('--draft'));
     assert.ok(calls[2].includes(source.source.commit));
+    const uploaded = calls[2].filter((value) => value.startsWith(`${directory}${path.sep}`));
+    assert.equal(uploaded.length, 12);
+    for (const name of [`eLLMsha-${source.version}-linux-x64.flatpak`, `eLLMsha-${source.version}-linux-x64.deb`, 'SHA256SUMS-linux-x64.txt', 'BUILD-METADATA-linux-x64.json']) assert.ok(uploaded.includes(path.join(directory, name)));
     assert.ok(!calls.flat().some((value) => value.includes('unrelated-private-file')));
     existing = { draft: true, tag_name: `v${source.version}`, target_commitish: source.source.commit, assets: [] };
     calls.length = 0;

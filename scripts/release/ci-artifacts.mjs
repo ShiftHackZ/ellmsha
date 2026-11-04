@@ -4,13 +4,15 @@ import { createReadStream } from 'node:fs';
 import { copyFile, mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveLinuxPackages } from './flatpak-preflight.mjs';
 
-const formats = { 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'] };
-export async function inspectArtifacts(directory, version, target) {
+const formats = { 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': resolveLinuxPackages() };
+export async function inspectArtifacts(directory, version, target, linuxPackages = 'all') {
   if (!formats[target] || !/^\d{4}\.\d{2}\.\d{2}-patch\.[1-9]\d*$/.test(version)) throw new Error('Unsupported release version or target');
   const checksumName = `SHA256SUMS-${target}.txt`;
   const checksumText = await readFile(path.join(directory, checksumName), 'utf8');
-  const expected = formats[target].map((extension) => `eLLMsha-${version}-${target}.${extension}`);
+  const extensions = target === 'linux-x64' ? resolveLinuxPackages(linuxPackages) : formats[target];
+  const expected = extensions.map((extension) => `eLLMsha-${version}-${target}.${extension}`);
   const checksums = new Map();
   for (const line of checksumText.trim().split(/\r?\n/)) {
     const match = /^([a-f0-9]{64})  (.+)$/.exec(line);
@@ -32,11 +34,14 @@ export async function inspectArtifacts(directory, version, target) {
   return { checksumName, files };
 }
 
-export async function stageArtifacts({ sourceFile, directory, output, target, signing }) {
+export async function stageArtifacts({ sourceFile, directory, output, target, signing, linuxPackages }) {
   const source = JSON.parse(await readFile(sourceFile, 'utf8'));
   if (!['unsigned', 'authenticode', 'developer-id-notarized'].includes(signing)) throw new Error('Unknown signing disposition');
   if (target === 'mac-arm64' && signing !== 'developer-id-notarized') throw new Error('Every CI macOS artifact must be signed and notarized');
-  const { checksumName, files } = await inspectArtifacts(directory, source.version, target);
+  if (target === 'linux-x64' && signing !== 'unsigned') throw new Error('Linux artifacts must declare unsigned packaging');
+  const selectedLinuxPackages = linuxPackages ?? source.linuxPackages ?? 'all';
+  if (target === 'linux-x64' && source.linuxPackages !== undefined && selectedLinuxPackages !== source.linuxPackages) throw new Error('Linux package selection differs from source manifest');
+  const { checksumName, files } = await inspectArtifacts(directory, source.version, target, selectedLinuxPackages);
   await mkdir(output, { recursive: true });
   for (const name of [...files.map((item) => item.name), checksumName]) await copyFile(path.join(directory, name), path.join(output, name));
   const manifest = { ...source, target, signing, files };
@@ -52,6 +57,7 @@ export async function verifyReleaseArtifacts({ directory, source }) {
     if (metadata.version !== source.version || metadata.source.commit !== source.source.commit || metadata.target !== target || JSON.stringify(metadata.source.submodules) !== JSON.stringify(source.source.submodules)) throw new Error('Installer source provenance differs from release checkout');
     if (JSON.stringify(metadata.files) !== JSON.stringify(actual.files)) throw new Error('Installer build metadata differs from actual bytes');
     if (target === 'mac-arm64' && metadata.signing !== 'developer-id-notarized') throw new Error('Refusing unsigned macOS artifact for verification/publication');
+    if (target === 'linux-x64' && metadata.signing !== 'unsigned') throw new Error('Linux artifacts must declare unsigned packaging');
     builds.push(metadata);
   }
   return builds;
@@ -60,7 +66,7 @@ export async function verifyReleaseArtifacts({ directory, source }) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const env = process.env;
-    if (process.argv[2] === 'stage') await stageArtifacts({ sourceFile: env.RELEASE_SOURCE_MANIFEST, directory: path.resolve('aionui/out'), output: env.RELEASE_STAGE_DIR, target: env.RELEASE_TARGET, signing: env.RELEASE_SIGNING });
+    if (process.argv[2] === 'stage') await stageArtifacts({ sourceFile: env.RELEASE_SOURCE_MANIFEST, directory: path.resolve('aionui/out'), output: env.RELEASE_STAGE_DIR, target: env.RELEASE_TARGET, signing: env.RELEASE_SIGNING, linuxPackages: env.RELEASE_LINUX_PACKAGES });
     else if (process.argv[2] === 'verify') await verifyReleaseArtifacts({ directory: env.RELEASE_STAGE_DIR, source: JSON.parse(await readFile(env.RELEASE_SOURCE_MANIFEST, 'utf8')) });
     else throw new Error('Use stage or verify');
   } catch (error) { console.error(error.message); process.exitCode = 1; }

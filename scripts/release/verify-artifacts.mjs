@@ -4,16 +4,18 @@ import { createReadStream } from 'node:fs';
 import { readFile, rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveLinuxPackages } from './flatpak-preflight.mjs';
 
-const formats = { darwin: ['mac', 'dmg', 'zip'], win32: ['win', 'exe'], linux: ['linux', 'flatpak', 'deb'] };
+const formats = { darwin: ['mac', 'dmg', 'zip'], win32: ['win', 'exe'], linux: ['linux'] };
 async function exists(file) {
   try { await stat(file); return true; }
   catch (error) { if (error.code === 'ENOENT') return false; throw error; }
 }
 
-export async function verifyArtifacts({ directory, version, platform = process.platform, arch = process.arch }) {
-  const [os, ...extensions] = formats[platform] || [];
+export async function verifyArtifacts({ directory, version, platform = process.platform, arch = process.arch, linuxPackages = 'all' }) {
+  const [os, ...nativeExtensions] = formats[platform] || [];
   if (!os) throw new Error(`Unsupported package host: ${platform}`);
+  const extensions = platform === 'linux' ? resolveLinuxPackages(linuxPackages) : nativeExtensions;
   const date = /^(\d{4})\.(\d{2})\.(\d{2})-patch\.([1-9]\d*)$/.exec(version);
   if (!date) throw new Error('Expected an exact date-formatted release version');
   // electron-builder normalizes package metadata with semver.clean(version, true).
@@ -41,5 +43,5 @@ export async function verifyArtifacts({ directory, version, platform = process.p
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const { version } = JSON.parse(await readFile(path.join(root, 'aionui/package.json'), 'utf8'));
-  await verifyArtifacts({ directory: path.join(root, 'aionui/out'), version });
+  await verifyArtifacts({ directory: path.join(root, 'aionui/out'), version, linuxPackages: process.env.RELEASE_LINUX_PACKAGES ?? 'all' });
 }

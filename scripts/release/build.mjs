@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkFlatpak } from './flatpak-preflight.mjs';
+import { checkFlatpak, resolveLinuxPackages } from './flatpak-preflight.mjs';
 import { electronBuilderIdentity, macSigning } from './mac-signing.mjs';
 import { checkBuildPrerequisites } from './build-prerequisites.mjs';
 
@@ -19,7 +19,8 @@ const signing = process.platform === 'darwin'
   ? macSigning({ root, enabled: args.has('--signed'), disabled: args.has('--unsigned') })
   : null;
 const signed = process.platform === 'darwin' ? Boolean(signing) : args.has('--signed');
-const targets = { darwin: ['--mac', 'dmg', 'zip'], win32: ['--win', 'nsis'], linux: ['--linux', 'flatpak', 'deb'] };
+const linuxPackages = resolveLinuxPackages(process.env.RELEASE_LINUX_PACKAGES);
+const targets = { darwin: ['--mac', 'dmg', 'zip'], win32: ['--win', 'nsis'], linux: ['--linux', ...linuxPackages] };
 if (!targets[process.platform] || !['arm64', 'x64'].includes(process.arch)) {
   throw new Error(`Unsupported native target: ${process.platform}-${process.arch}`);
 }
@@ -74,7 +75,7 @@ if (args.has('--plan')) {
   console.log(JSON.stringify({ target: `${process.platform}-${process.arch}`, signed, signingType: signing?.type, publish: false, steps }, null, 2));
 } else {
   checkBuildPrerequisites(root);
-  if (process.platform === 'linux') {
+  if (process.platform === 'linux' && linuxPackages.includes('flatpak')) {
     const require = createRequire(path.join(root, 'aionui/package.json'));
     const config = require('js-yaml').load(readFileSync(path.join(root, 'aionui/packages/desktop/electron-builder.yml'), 'utf8'));
     checkFlatpak(config.flatpak);

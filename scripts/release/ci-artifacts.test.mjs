@@ -7,14 +7,14 @@ import path from 'node:path';
 import { inspectArtifacts, stageArtifacts, verifyReleaseArtifacts } from './ci-artifacts.mjs';
 import { verifyArtifacts } from './verify-artifacts.mjs';
 
-test('release requires both platform installers, exact hashes and source provenance', async () => {
+test('release requires all three platform installers, exact hashes and source provenance', async () => {
   const temp = await mkdtemp(path.join(os.tmpdir(), 'ellmsha-ci-artifacts-'));
   const source = { version: '2026.10.13-patch.10', publish: true, source: { commit: 'a'.repeat(40), submodules: [{ path: 'aionui', commit: 'b'.repeat(40) }] } };
   const sourceFile = path.join(temp, 'source.json');
   const output = path.join(temp, 'staged');
   try {
     await writeFile(sourceFile, JSON.stringify(source));
-    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'] })) {
+    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': ['flatpak', 'deb'] })) {
       const entries = [];
       for (const extension of extensions) {
         const name = `eLLMsha-${source.version}-${target}.${extension}`;
@@ -25,7 +25,13 @@ test('release requires both platform installers, exact hashes and source provena
       await writeFile(path.join(temp, `SHA256SUMS-${target}.txt`), `${entries.join('\n')}\n`);
       await stageArtifacts({ sourceFile, directory: temp, output, target, signing: target === 'mac-arm64' ? 'developer-id-notarized' : 'unsigned' });
     }
-    assert.equal((await verifyReleaseArtifacts({ directory: output, source })).length, 2);
+    assert.equal((await verifyReleaseArtifacts({ directory: output, source })).length, 3);
+    const linuxChecksumPath = path.join(output, 'SHA256SUMS-linux-x64.txt');
+    const linuxChecksum = await readFile(linuxChecksumPath, 'utf8');
+    await writeFile(linuxChecksumPath, linuxChecksum.split('\n')[0]);
+    await assert.rejects(() => verifyReleaseArtifacts({ directory: output, source }), /incomplete/);
+    await writeFile(linuxChecksumPath, linuxChecksum);
+    await assert.rejects(() => stageArtifacts({ sourceFile, directory: temp, output, target: 'linux-x64', signing: 'developer-id-notarized' }), /Linux artifacts must declare unsigned/);
     await assert.rejects(() => verifyReleaseArtifacts({ directory: output, source: { ...source, source: { ...source.source, commit: 'c'.repeat(40) } } }), /provenance/);
     await assert.rejects(() => stageArtifacts({ sourceFile, directory: temp, output, target: 'mac-arm64', signing: 'unsigned' }), /signed and notarized/);
     // Signing is mandatory for verification too, even though nothing is published.
@@ -35,7 +41,7 @@ test('release requires both platform installers, exact hashes and source provena
     const signed = await stageArtifacts({ sourceFile, directory: temp, output, target: 'mac-arm64', signing: 'developer-id-notarized' });
     assert.equal(signed.publish, false);
     assert.equal(signed.signMacos, true);
-    assert.equal((await verifyReleaseArtifacts({ directory: output, source: verification })).length, 2);
+    assert.equal((await verifyReleaseArtifacts({ directory: output, source: verification })).length, 3);
     // Old/malformed provenance cannot opt out of the fixed macOS signing contract.
     const unsigned = { ...verification, signMacos: false };
     await writeFile(sourceFile, JSON.stringify(unsigned));
@@ -65,7 +71,7 @@ for (const [platform, target, extensions] of [['darwin', 'mac-arm64', ['dmg', 'z
       const checksum = await readFile(path.join(temp, `SHA256SUMS-${target}.txt`), 'utf8');
       assert.ok(checksum.includes(createHash('sha256').update(data).digest('hex')));
       assert.ok(checksum.includes(`eLLMsha-${version}-${target}`));
-      if (target !== 'linux-x64') assert.equal((await inspectArtifacts(temp, version, target)).files.length, extensions.length);
+      assert.equal((await inspectArtifacts(temp, version, target)).files.length, extensions.length);
       await verifyArtifacts({ directory: temp, version, platform, arch: target.endsWith('arm64') ? 'arm64' : 'x64' });
     } finally { await rm(temp, { recursive: true, force: true }); }
   });
@@ -84,3 +90,31 @@ test('date normalization never accepts a different patch or overwrites an existi
     assert.equal(await readFile(publicName, 'utf8'), 'existing public bytes');
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
+
+for (const linuxPackages of ['flatpak', 'deb']) {
+  test(`Linux ${linuxPackages}-only verification stages exact selected bytes without requiring other formats`, async () => {
+    const temp = await mkdtemp(path.join(os.tmpdir(), 'ellmsha-linux-artifact-'));
+    const source = { version: '2026.11.04-patch.1', publish: false, linuxPackages, source: { commit: 'a'.repeat(40), submodules: [] } };
+    const sourceFile = path.join(temp, 'source.json');
+    const output = path.join(temp, 'staged');
+    const data = Buffer.from(`synthetic ${linuxPackages} bytes`);
+    const nativeName = `eLLMsha-2026.11.4-patch.1-linux-x64.${linuxPackages}`;
+    const publicName = `eLLMsha-${source.version}-linux-x64.${linuxPackages}`;
+    try {
+      await writeFile(sourceFile, JSON.stringify(source));
+      await writeFile(path.join(temp, nativeName), data);
+      await verifyArtifacts({ directory: temp, version: source.version, platform: 'linux', arch: 'x64', linuxPackages });
+      const staged = await stageArtifacts({ sourceFile, directory: temp, output, target: 'linux-x64', signing: 'unsigned' });
+      assert.deepEqual(staged.files, [{ name: publicName, size: data.length, sha256: createHash('sha256').update(data).digest('hex') }]);
+      assert.equal(staged.linuxPackages, linuxPackages);
+      assert.deepEqual(await readFile(path.join(output, publicName)), data);
+      // Official publication deliberately uses the complete default allowlist.
+      await assert.rejects(() => inspectArtifacts(output, source.version, 'linux-x64'), /incomplete/);
+      await assert.rejects(() => stageArtifacts({ sourceFile, directory: temp, output, target: 'linux-x64', signing: 'unsigned', linuxPackages: 'all' }), /selection differs/);
+      await assert.rejects(() => verifyArtifacts({ directory: temp, version: source.version, platform: 'linux', arch: 'x64', linuxPackages: 'AppImage' }), /Linux package selection/);
+      const sums = await readFile(path.join(temp, 'SHA256SUMS-linux-x64.txt'), 'utf8');
+      await writeFile(path.join(temp, 'SHA256SUMS-linux-x64.txt'), `${sums}${sums}`);
+      await assert.rejects(() => inspectArtifacts(temp, source.version, 'linux-x64', linuxPackages), /duplicate/);
+    } finally { await rm(temp, { recursive: true, force: true }); }
+  });
+}

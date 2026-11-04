@@ -3,12 +3,21 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveLinuxPackages } from './flatpak-preflight.mjs';
 
 export const RELEASE_REPOSITORY = 'ShiftHackZ/ellmsha';
 export const MAC_SIGNING_SECRETS = [
   'MAC_CERTIFICATE_P12_BASE64', 'MAC_CERTIFICATE_PASSWORD', 'MAC_SIGNING_IDENTITY',
   'MAC_TEAM_ID', 'MAC_NOTARY_APPLE_ID', 'MAC_NOTARY_APP_PASSWORD',
 ];
+
+export function desktopMatrix({ macos, windows, linux }) {
+  return { include: [
+    ...(macos ? [{ os: 'macos-15', target: 'mac-arm64', signing: 'signed + notarized', environment: 'release' }] : []),
+    ...(windows ? [{ os: 'windows-2022', target: 'win-x64', signing: 'unsigned', environment: 'ci' }] : []),
+    ...(linux ? [{ os: 'ubuntu-24.04', target: 'linux-x64', signing: 'unsigned', environment: 'ci' }] : []),
+  ] };
+}
 
 export function resolveReleaseMode(env) {
   if (!['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)) throw new Error('Release workflow accepts only tag push or manual dispatch');
@@ -17,14 +26,21 @@ export function resolveReleaseMode(env) {
     if (value !== undefined && !['true', 'false'].includes(value)) throw new Error('Build selection must be true or false');
     return value !== 'false';
   };
-  const desktop = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_DESKTOP);
+  const macos = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_MACOS);
+  const windows = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_WINDOWS);
+  const linux = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_LINUX);
   const docker = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_DOCKER);
-  if (!desktop && !docker) throw new Error('Select at least one build: desktop or docker');
-  if (publish && (!desktop || !docker)) throw new Error('Publication requires both desktop and docker builds from this run');
-  if (desktop && env.REQUIRE_SIGNING_SECRETS === 'true' && env.MAC_SIGNING_READY !== 'true') {
+  const linuxPackages = env.GITHUB_EVENT_NAME === 'push' ? 'all' : env.RELEASE_LINUX_PACKAGES ?? 'all';
+  resolveLinuxPackages(linuxPackages);
+  const desktop = macos || windows || linux;
+  if (!desktop && !docker) throw new Error('Select at least one build: macos, windows, linux or docker');
+  if (publish && (!macos || !windows || !linux || !docker || linuxPackages !== 'all')) {
+    throw new Error('Publication requires all four platforms and all Linux packages from this run');
+  }
+  if (macos && env.REQUIRE_SIGNING_SECRETS === 'true' && env.MAC_SIGNING_READY !== 'true') {
     throw new Error(`Signed macOS verification/publication requires Developer ID/notarization secrets: ${MAC_SIGNING_SECRETS.join(', ')}`);
   }
-  return { publish, signMacos: true, desktop, docker };
+  return { publish, signMacos: macos, macos, windows, linux, docker, desktop, linuxPackages };
 }
 
 export function releaseDate(now = new Date()) {
@@ -74,7 +90,8 @@ export function collectSource(root, runGit = (args, cwd = root) => execFileSync(
 }
 
 export function main(env = process.env) {
-  const { publish, signMacos, desktop, docker } = resolveReleaseMode(env);
+  const mode = resolveReleaseMode(env);
+  const { publish, desktop, macos, windows, linux, docker, linuxPackages } = mode;
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const version = JSON.parse(readFileSync(path.join(root, 'aionui/package.json'), 'utf8')).version;
   const branding = JSON.parse(readFileSync(path.join(root, 'aionui/packages/desktop/src/common/branding/release.json'), 'utf8'));
@@ -86,9 +103,9 @@ export function main(env = process.env) {
     if (tagCommit !== source.commit) throw new Error('Release tag does not point at this source commit');
     readFileSync(path.join(root, 'docs/releases', `${version}.md`));
   }
-  const manifest = { schema: 1, ...release, signMacos, desktop, docker, source, checkedAt: new Date().toISOString() };
+  const manifest = { schema: 1, ...release, ...mode, source, checkedAt: new Date().toISOString() };
   if (env.RELEASE_SOURCE_MANIFEST) writeFileSync(env.RELEASE_SOURCE_MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`);
-  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `version=${version}\ntag=${release.tag}\nsource_ref=${source.commit}\npublish=${publish}\ndesktop=${desktop}\ndocker=${docker}\n`);
+  if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `version=${version}\ntag=${release.tag}\nsource_ref=${source.commit}\npublish=${publish}\ndesktop=${desktop}\nmacos=${macos}\nwindows=${windows}\nlinux=${linux}\ndocker=${docker}\nlinux_packages=${linuxPackages}\ndesktop_matrix=${JSON.stringify(desktopMatrix(mode))}\n`);
   console.log(JSON.stringify(manifest, null, 2));
   return manifest;
 }
