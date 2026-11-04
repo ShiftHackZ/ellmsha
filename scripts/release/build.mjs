@@ -21,6 +21,10 @@ const signing = process.platform === 'darwin'
 const signed = process.platform === 'darwin' ? Boolean(signing) : args.has('--signed');
 const linuxPackages = resolveLinuxPackages(process.env.RELEASE_LINUX_PACKAGES);
 const targets = { darwin: ['--mac', 'dmg', 'zip'], win32: ['--win', 'nsis'], linux: ['--linux', ...linuxPackages] };
+// FPM requires a package URL; the root release owns the fork's homepage.
+const packagingArgs = process.platform === 'linux' && linuxPackages.includes('deb')
+  ? ['--config.extraMetadata.homepage=https://github.com/ShiftHackZ/ellmsha']
+  : [];
 if (!targets[process.platform] || !['arm64', 'x64'].includes(process.arch)) {
   throw new Error(`Unsupported native target: ${process.platform}-${process.arch}`);
 }
@@ -69,7 +73,7 @@ if (signing) {
 }
 const steps = [
   ['cargo', ['build', '--locked', '--release', '-p', 'aionui-app', '--bin', 'aioncore'], 'aioncore'],
-  [process.execPath, ['scripts/build-with-builder.js', process.arch, ...targets[process.platform], `--${process.arch}`, ...signingArgs], 'aionui'],
+  [process.execPath, ['scripts/build-with-builder.js', process.arch, ...targets[process.platform], `--${process.arch}`, ...packagingArgs, ...signingArgs], 'aionui'],
 ];
 if (args.has('--plan')) {
   console.log(JSON.stringify({ target: `${process.platform}-${process.arch}`, signed, signingType: signing?.type, publish: false, steps }, null, 2));

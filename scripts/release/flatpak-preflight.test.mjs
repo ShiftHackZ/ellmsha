@@ -31,7 +31,8 @@ test('native Linux build plans forward only the selected package formats', () =>
     const plan = JSON.parse(result.stdout);
     assert.equal(plan.target, 'linux-x64');
     assert.equal(plan.publish, false);
-    assert.deepEqual(plan.steps[1][1], ['scripts/build-with-builder.js', 'x64', '--linux', ...resolveLinuxPackages(selection), '--x64']);
+    const metadata = selection === 'flatpak' ? [] : ['--config.extraMetadata.homepage=https://github.com/ShiftHackZ/ellmsha'];
+    assert.deepEqual(plan.steps[1][1], ['scripts/build-with-builder.js', 'x64', '--linux', ...resolveLinuxPackages(selection), '--x64', ...metadata]);
   }
 });
 
