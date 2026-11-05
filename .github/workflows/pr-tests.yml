@@ -28,6 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          fetch-depth: 0
           submodules: recursive
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -41,6 +42,10 @@ jobs:
           path: ${{ env.BUN_INSTALL_CACHE_DIR }}
           key: pr-bun-ubuntu24-1.3.9-${{ hashFiles('aionui/bun.lock') }}
       - uses: ./.github/actions/install-desktop-dependencies
+      - name: Prepare the pinned Chrome DevTools dependency and browser MCP bundle
+        run: node scripts/prepare-chrome-devtools-mcp.js
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
       - run: bun run test
         working-directory: aionui
 
