@@ -20,7 +20,8 @@ const signing = process.platform === 'darwin'
   : null;
 const signed = process.platform === 'darwin' ? Boolean(signing) : args.has('--signed');
 const linuxPackages = resolveLinuxPackages(process.env.RELEASE_LINUX_PACKAGES);
-const targets = { darwin: ['--mac', 'dmg', 'zip'], win32: ['--win', 'nsis'], linux: ['--linux', ...linuxPackages] };
+const hostLinuxTargets = linuxPackages.filter(format => format !== 'AppImage');
+const targets = { darwin: ['--mac', 'dmg', 'zip'], win32: ['--win', 'nsis'], linux: ['--linux', ...(hostLinuxTargets.length ? hostLinuxTargets : ['dir'])] };
 // FPM requires a package URL; the root release owns the fork's homepage.
 const packagingArgs = process.platform === 'linux' && linuxPackages.includes('deb')
   ? ['--config.extraMetadata.homepage=https://github.com/ShiftHackZ/ellmsha']
@@ -75,6 +76,9 @@ const steps = [
   ['cargo', ['build', '--locked', '--release', '-p', 'aionui-app', '--bin', 'aioncore'], 'aioncore'],
   [process.execPath, ['scripts/build-with-builder.js', process.arch, ...targets[process.platform], `--${process.arch}`, ...packagingArgs, ...signingArgs], 'aionui'],
 ];
+if (process.platform === 'linux' && linuxPackages.includes('AppImage')) {
+  steps.push(['bash', ['scripts/release/package-appimage.sh', process.arch], '.']);
+}
 if (args.has('--plan')) {
   console.log(JSON.stringify({ target: `${process.platform}-${process.arch}`, signed, signingType: signing?.type, publish: false, steps }, null, 2));
 } else {

@@ -1,0 +1,73 @@
+name: Pull request tests
+on:
+  pull_request:
+    branches: [develop, main]
+permissions:
+  contents: read
+concurrency:
+  group: pr-tests-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.11.0'
+      - run: node --test scripts/release/*.test.mjs scripts/run-build-command.test.js
+
+  desktop:
+    runs-on: ubuntu-24.04
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: 'true'
+      BUN_INSTALL_CACHE_DIR: ${{ github.workspace }}/.data/pr-bun-cache
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.11.0'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.3.9'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ env.BUN_INSTALL_CACHE_DIR }}
+          key: pr-bun-ubuntu24-1.3.9-${{ hashFiles('aionui/bun.lock') }}
+      - uses: ./.github/actions/install-desktop-dependencies
+      - run: bun run test
+        working-directory: aionui
+
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { component: aioncore, toolchain: '1.95.0' }
+          - { component: aionrs, toolchain: '1.96.1' }
+    runs-on: ubuntu-24.04
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ matrix.component }}/target
+          key: pr-ubuntu24-${{ matrix.component }}-${{ matrix.toolchain }}-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: pr-ubuntu24-${{ matrix.component }}-${{ matrix.toolchain }}-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock') }}-
+      - run: cargo +${{ matrix.toolchain }} test --locked --workspace --lib
+        working-directory: ${{ matrix.component }}

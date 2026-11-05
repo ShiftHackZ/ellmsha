@@ -11,9 +11,9 @@ export const MAC_SIGNING_SECRETS = [
   'MAC_TEAM_ID', 'MAC_NOTARY_APPLE_ID', 'MAC_NOTARY_APP_PASSWORD',
 ];
 
-export function desktopMatrix({ macos, windows, linux }) {
+export function desktopMatrix({ macos, signMacos, windows, linux }) {
   return { include: [
-    ...(macos ? [{ os: 'macos-15', target: 'mac-arm64', signing: 'signed + notarized', environment: 'release' }] : []),
+    ...(macos ? [{ os: 'macos-15', target: 'mac-arm64', signing: signMacos ? 'signed + notarized' : 'unsigned', environment: signMacos ? 'release' : 'ci' }] : []),
     ...(windows ? [{ os: 'windows-2022', target: 'win-x64', signing: 'unsigned', environment: 'ci' }] : []),
     ...(linux ? [{ os: 'ubuntu-24.04', target: 'linux-x64', signing: 'unsigned', environment: 'ci' }] : []),
   ] };
@@ -28,19 +28,26 @@ export function resolveReleaseMode(env) {
   };
   const macos = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_MACOS);
   const windows = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_WINDOWS);
-  const linux = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_LINUX);
+  let linux = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_LINUX);
   const docker = env.GITHUB_EVENT_NAME === 'push' || selected(env.RELEASE_BUILD_DOCKER);
-  const linuxPackages = env.GITHUB_EVENT_NAME === 'push' ? 'all' : env.RELEASE_LINUX_PACKAGES ?? 'all';
+  let linuxPackages = env.GITHUB_EVENT_NAME === 'push' ? 'all' : env.RELEASE_LINUX_PACKAGES ?? 'all';
+  const formats = ['flatpak', 'deb', 'appimage'];
+  if (env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.RELEASE_LINUX_FLATPAK !== undefined) {
+    const requested = formats.filter(format => selected(env[`RELEASE_LINUX_${format.toUpperCase()}`]));
+    linux = requested.length > 0;
+    linuxPackages = requested.length && requested.length < formats.length ? requested.join(',') : 'all';
+  }
   resolveLinuxPackages(linuxPackages);
+  const signMacos = macos && (env.GITHUB_REF === 'refs/heads/main' || env.GITHUB_REF?.startsWith('refs/tags/v'));
   const desktop = macos || windows || linux;
   if (!desktop && !docker) throw new Error('Select at least one build: macos, windows, linux or docker');
   if (publish && (!macos || !windows || !linux || !docker || linuxPackages !== 'all')) {
     throw new Error('Publication requires all four platforms and all Linux packages from this run');
   }
-  if (macos && env.REQUIRE_SIGNING_SECRETS === 'true' && env.MAC_SIGNING_READY !== 'true') {
+  if (signMacos && env.REQUIRE_SIGNING_SECRETS === 'true' && env.MAC_SIGNING_READY !== 'true') {
     throw new Error(`Signed macOS verification/publication requires Developer ID/notarization secrets: ${MAC_SIGNING_SECRETS.join(', ')}`);
   }
-  return { publish, signMacos: macos, macos, windows, linux, docker, desktop, linuxPackages };
+  return { publish, signMacos, macos, windows, linux, docker, desktop, linuxPackages };
 }
 
 export function releaseDate(now = new Date()) {

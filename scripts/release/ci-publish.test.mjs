@@ -14,7 +14,7 @@ test('publication resumes only an exact-source draft and never overwrites a publ
   const sourceFile = path.join(temp, 'source.json'), directory = path.join(temp, 'staged');
   try {
     await writeFile(sourceFile, JSON.stringify(source));
-    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': ['flatpak', 'deb'] })) {
+    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': ['flatpak', 'deb', 'AppImage'] })) {
       const sums = [];
       for (const extension of extensions) {
         const name = `eLLMsha-${source.version}-${target}.${extension}`, content = `fixture ${name}`;
@@ -44,8 +44,8 @@ test('publication resumes only an exact-source draft and never overwrites a publ
     assert.ok(calls[2].includes('--draft'));
     assert.ok(calls[2].includes(source.source.commit));
     const uploaded = calls[2].filter((value) => value.startsWith(`${directory}${path.sep}`));
-    assert.equal(uploaded.length, 12);
-    for (const name of [`eLLMsha-${source.version}-linux-x64.flatpak`, `eLLMsha-${source.version}-linux-x64.deb`, 'SHA256SUMS-linux-x64.txt', 'BUILD-METADATA-linux-x64.json']) assert.ok(uploaded.includes(path.join(directory, name)));
+    assert.equal(uploaded.length, 13);
+    for (const name of [`eLLMsha-${source.version}-linux-x64.flatpak`, `eLLMsha-${source.version}-linux-x64.deb`, `eLLMsha-${source.version}-linux-x64.AppImage`, 'SHA256SUMS-linux-x64.txt', 'BUILD-METADATA-linux-x64.json']) assert.ok(uploaded.includes(path.join(directory, name)));
     assert.ok(!calls.flat().some((value) => value.includes('unrelated-private-file')));
     existing = { draft: true, tag_name: `v${source.version}`, target_commitish: source.source.commit, assets: [] };
     calls.length = 0;

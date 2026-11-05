@@ -7,17 +7,17 @@ import { checkFlatpak, installFlatpak, resolveLinuxPackages } from './flatpak-pr
 const config = { runtime: 'org.freedesktop.Platform', sdk: 'org.freedesktop.Sdk', runtimeVersion: '26.08', base: 'org.electronjs.Electron2.BaseApp', baseVersion: '26.08' };
 
 test('Linux package selection is explicit and rejects unsupported formats', () => {
-  assert.deepEqual(resolveLinuxPackages(), ['flatpak', 'deb']);
-  assert.deepEqual(resolveLinuxPackages('all'), ['flatpak', 'deb']);
+  assert.deepEqual(resolveLinuxPackages(), ['flatpak', 'deb', 'AppImage']);
+  assert.deepEqual(resolveLinuxPackages('all'), ['flatpak', 'deb', 'AppImage']);
   assert.deepEqual(resolveLinuxPackages('flatpak'), ['flatpak']);
   assert.deepEqual(resolveLinuxPackages('deb'), ['deb']);
-  for (const value of ['', 'appimage', 'flatpak,deb', '--publish=always', null]) {
+  for (const value of ['', 'rpm', 'deb,deb', '--publish=always', null]) {
     assert.throws(() => resolveLinuxPackages(value), /Linux package selection/);
   }
 });
 
 test('native Linux build plans forward only the selected package formats', () => {
-  for (const selection of ['all', 'flatpak', 'deb']) {
+  for (const selection of ['all', 'flatpak', 'deb', 'appimage', 'deb,appimage', 'flatpak,appimage']) {
     // Planning does not execute a build or sandbox; model the native Linux host
     // so this contract also runs in macOS and Windows release preflight.
     const script = new URL('./build.mjs', import.meta.url);
@@ -31,8 +31,12 @@ test('native Linux build plans forward only the selected package formats', () =>
     const plan = JSON.parse(result.stdout);
     assert.equal(plan.target, 'linux-x64');
     assert.equal(plan.publish, false);
-    const metadata = selection === 'flatpak' ? [] : ['--config.extraMetadata.homepage=https://github.com/ShiftHackZ/ellmsha'];
-    assert.deepEqual(plan.steps[1][1], ['scripts/build-with-builder.js', 'x64', '--linux', ...resolveLinuxPackages(selection), '--x64', ...metadata]);
+    const targets = resolveLinuxPackages(selection);
+    const host = targets.filter(value => value !== 'AppImage');
+    const metadata = !targets.includes('deb') ? [] : ['--config.extraMetadata.homepage=https://github.com/ShiftHackZ/ellmsha'];
+    assert.deepEqual(plan.steps[1][1], ['scripts/build-with-builder.js', 'x64', '--linux', ...(host.length ? host : ['dir']), '--x64', ...metadata]);
+    assert.equal(plan.steps.length, targets.includes('AppImage') ? 3 : 2);
+    if (targets.includes('AppImage')) assert.deepEqual(plan.steps[2], ['bash', ['scripts/release/package-appimage.sh', 'x64'], '.']);
   }
 });
 

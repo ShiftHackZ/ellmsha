@@ -10,7 +10,7 @@
 
 **Cloud models · Local models · Persistent context · Tools you can extend**
 
-[How it works](docs/architecture.md) · [Working effectively](docs/workflows.md) · [Build desktop](scripts/release/README.md) · [VPS deployment](docs/vps-deployment.md) · [Release status](docs/release-status.md)
+[How it works](docs/architecture.md) · [Working effectively](docs/workflows.md) · [Builds and CI/CD](CI.md) · [Branch strategy](GIT.md) · [VPS deployment](docs/vps-deployment.md) · [Release status](docs/release-status.md)
 
 </div>
 
@@ -57,9 +57,12 @@ Installed macOS test profile after rebuilding its fixture with a 768-dimensional
 <p>
   <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-macos.svg" alt="Download eLLMsha for macOS — Apple silicon" height="72"></a>
   <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-windows.svg" alt="Download eLLMsha for Windows — x64" height="72"></a>
+  <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-linux-flatpak.svg" alt="Download Linux x64 Flatpak" height="72"></a>
+  <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-linux-deb.svg" alt="Download Linux x64 DEB" height="72"></a>
+  <a href="https://github.com/ShiftHackZ/ellmsha/releases/latest"><img src="docs/assets/download-linux-appimage.svg" alt="Download Linux x64 AppImage" height="72"></a>
 </p>
 
-Choose the **macOS Apple silicon DMG** or **Windows x64 EXE** on the [latest release page](https://github.com/ShiftHackZ/ellmsha/releases/latest). macOS releases are Developer ID signed and notarized; Windows installers are currently unsigned.
+Choose the **macOS Apple silicon DMG** or **Windows x64 EXE** on the [latest release page](https://github.com/ShiftHackZ/ellmsha/releases/latest). macOS releases are Developer ID signed and notarized; Windows installers are currently unsigned. For Linux x64, look for the `.flatpak`, `.deb` or `.AppImage` asset. Releases predating Linux packaging may omit these formats. Development packages are available as [GitHub Actions artifacts](CI.md#build-just-what-you-need).
 
 1. Install the app and open a project folder. Attach additional repositories from the Files panel when needed.
 2. Choose an agent and model. For local inference, configure Ollama and download a suitable model.
