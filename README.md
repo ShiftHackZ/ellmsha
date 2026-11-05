@@ -198,7 +198,9 @@ The catalog supports enabling plugins, connecting accounts and installing additi
 | --- | --- | --- |
 | macOS | ✅ arm64 / Apple silicon | ✅ Linux amd64 via Docker Desktop; emulated on Apple silicon |
 | Windows | ✅ x64 / x86-64 | ✅ Linux amd64 via Docker Desktop / WSL2 |
-| Linux | ❌ No published desktop package | ✅ amd64 / x86-64, native Docker Engine |
+| Linux | ✅ x64 / x86-64 · Flatpak, DEB and AppImage ([development builds](CI.md#build-just-what-you-need)) | ✅ amd64 / x86-64, native Docker Engine |
+
+GitHub Actions has built all three Linux desktop formats. Native Linux desktop launch testing is still pending.
 
 Docker packages are **Linux amd64** images. Other host architectures need [emulation](https://docs.docker.com/build/building/multi-platform/); Linux arm64 images are not currently published. See [releases](https://github.com/ShiftHackZ/ellmsha/releases) for available installers and image versions.
 
