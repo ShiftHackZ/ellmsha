@@ -1,6 +1,6 @@
 # Building eLLMsha with GitHub Actions
 
-Use the root repository's **Release installers and VPS images** workflow for development builds as well as releases. A development build produces downloadable run artifacts. A release publishes installers to GitHub Releases and images to GHCR.
+Use the root repository's **Release installers and VPS images** workflow for development builds as well as releases. A development build produces downloadable run artifacts. A release publishes installers to GitHub Releases and images to GHCR. All branches use the same production packaging and verification; only the source ref, platform selection and publication choice differ. Test profiles and synthetic credentials are created separately during QA and are never embedded in installers.
 
 ## Build just what you need
 
@@ -11,7 +11,7 @@ Use the root repository's **Release installers and VPS images** workflow for dev
 
 | Input | Output |
 | --- | --- |
-| `macos` | Apple silicon DMG and ZIP. Main and release tags use Developer ID signing and notarization. Development branches produce unsigned installers. |
+| `macos` | Apple silicon DMG and ZIP. Every branch uses the same Developer ID signing and notarization as main. |
 | `windows` | Unsigned Windows x64 installer |
 | `linux-flatpak` | Linux x64 Flatpak bundle |
 | `linux-deb` | Linux x64 Debian package |
@@ -42,4 +42,4 @@ Desktop builds cache compiled Rust dependencies, package-manager downloads, Elec
 2. Check the release notes and the package/About version. Push the matching immutable `vYYYY.MM.DD-patch.N` tag at that exact commit. The tag push selects **all six outputs** and starts publication automatically.
 3. Let that run finish. Its publish job checks the exact tag, Kyiv release date, source manifests, installer hashes and tested images before publishing. Verify the distributed assets from the [release page](https://github.com/ShiftHackZ/ellmsha/releases) because publication rebuilds them.
 
-Manual publication is reserved for the exact tagged commit on main or the matching tag and requires all six outputs. Avoid dispatching a second publication for a tag that already triggered a run. Configure GitHub's **release** environment deployment restrictions for `main` and release tags and keep signing secrets in that environment. See [signing and build prerequisites](scripts/release/README.md) and [branching strategy](GIT.md).
+Manual publication is reserved for the exact tagged commit on main or the matching tag and requires all six outputs. Avoid dispatching a second publication for a tag that already triggered a run. Keep signing secrets in GitHub's **release** environment. Set its deployment branch policy to **All branches** so manually selected refs use the same signing path; retain any required reviewer protections. Only repository collaborators can dispatch these builds. Signing failure stops the build—there is no unsigned fallback. PR test workflows do not receive signing secrets. See [signing and build prerequisites](scripts/release/README.md) and [branching strategy](GIT.md).

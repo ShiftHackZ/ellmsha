@@ -11,9 +11,9 @@ export const MAC_SIGNING_SECRETS = [
   'MAC_TEAM_ID', 'MAC_NOTARY_APPLE_ID', 'MAC_NOTARY_APP_PASSWORD',
 ];
 
-export function desktopMatrix({ macos, signMacos, windows, linux }) {
+export function desktopMatrix({ macos, windows, linux }) {
   return { include: [
-    ...(macos ? [{ os: 'macos-15', target: 'mac-arm64', signing: signMacos ? 'signed + notarized' : 'unsigned', environment: signMacos ? 'release' : 'ci' }] : []),
+    ...(macos ? [{ os: 'macos-15', target: 'mac-arm64', signing: 'signed + notarized', environment: 'release' }] : []),
     ...(windows ? [{ os: 'windows-2022', target: 'win-x64', signing: 'unsigned', environment: 'ci' }] : []),
     ...(linux ? [{ os: 'ubuntu-24.04', target: 'linux-x64', signing: 'unsigned', environment: 'ci' }] : []),
   ] };
@@ -38,7 +38,7 @@ export function resolveReleaseMode(env) {
     linuxPackages = requested.length && requested.length < formats.length ? requested.join(',') : 'all';
   }
   resolveLinuxPackages(linuxPackages);
-  const signMacos = macos && (env.GITHUB_REF === 'refs/heads/main' || env.GITHUB_REF?.startsWith('refs/tags/v'));
+  const signMacos = macos;
   const desktop = macos || windows || linux;
   if (!desktop && !docker) throw new Error('Select at least one build: macos, windows, linux or docker');
   if (publish && (!macos || !windows || !linux || !docker || linuxPackages !== 'all')) {

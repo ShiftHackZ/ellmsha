@@ -92,7 +92,7 @@ The final release workflow rebuilds the installers; it does not promote the exac
 
 ## GitHub Actions release pipeline
 
-See [CI.md](../../CI.md) for manual branch selection, platform switches, PR tests, artifact downloads and release-tag behavior. Signed macOS jobs require the six release-environment secrets listed below.
+See [CI.md](../../CI.md) for manual branch selection, platform switches, PR tests, artifact downloads and release-tag behavior. Every macOS job, including develop and feature branches, uses the same signing, notarization and validation as main and requires the six release-environment secrets listed below. There is no unsigned CI fallback.
 
 The workflow has no pull-request trigger. Public publication requires the official `ShiftHackZ/ellmsha` repository, an exact `vYYYY.MM.DD-patch.N` tag, matching package/About metadata and release notes at `docs/releases/YYYY.MM.DD-patch.N.md`. The version's date must equal the publication day in **Europe/Kyiv**. Manual verification runs accept a candidate's earlier date; bump the metadata before tagging if publication moves to another day. Both preflight and the final publication job check the date, root SHA and every recursive gitlink. Changed fork revisions must already be available from their public remotes.
 

@@ -37,8 +37,7 @@ export async function inspectArtifacts(directory, version, target, linuxPackages
 export async function stageArtifacts({ sourceFile, directory, output, target, signing, linuxPackages }) {
   const source = JSON.parse(await readFile(sourceFile, 'utf8'));
   if (!['unsigned', 'authenticode', 'developer-id-notarized'].includes(signing)) throw new Error('Unknown signing disposition');
-  const unsignedDevMac = source.publish === false && source.signMacos === false && signing === 'unsigned';
-  if (target === 'mac-arm64' && !unsignedDevMac && signing !== 'developer-id-notarized') throw new Error('Every CI macOS artifact must be signed and notarized');
+  if (target === 'mac-arm64' && signing !== 'developer-id-notarized') throw new Error('Every CI macOS artifact must be signed and notarized');
   if (target === 'linux-x64' && signing !== 'unsigned') throw new Error('Linux artifacts must declare unsigned packaging');
   const selectedLinuxPackages = linuxPackages ?? source.linuxPackages ?? 'all';
   if (target === 'linux-x64' && source.linuxPackages !== undefined && selectedLinuxPackages !== source.linuxPackages) throw new Error('Linux package selection differs from source manifest');

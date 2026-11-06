@@ -41,7 +41,8 @@ test('desktop packaging has a bounded heap inherited by its Node subprocesses', 
 
 test('signed verification wires the same signing lifecycle without enabling publication', () => {
   assert.doesNotMatch(workflow, /sign_macos|WINDOWS_SIGNING_ENABLED|WINDOWS_CERTIFICATE|WIN_CSC|Authenticode/);
-  assert.match(workflow, /preflight:\n\s+runs-on: ubuntu-24.04\n\s+environment: \$\{\{ \(github.event_name == 'push' \|\| \(inputs.macos && \(github.ref == 'refs\/heads\/main' \|\| startsWith\(github.ref, 'refs\/tags\/v'\)\)\)\) && 'release' \|\| 'ci' \}\}/);
+  assert.ok(workflow.includes("environment: ${{ (github.event_name == 'push' || inputs.macos) && 'release' || 'ci' }}"));
+  assert.doesNotMatch(workflow, /Build unsigned macOS|signed on main and release tags/);
   assert.match(workflow, /REQUIRE_SIGNING_SECRETS: 'true'/);
   const readiness = workflow.match(/MAC_SIGNING_READY: (.+)/)[1];
   for (const secret of ['MAC_CERTIFICATE_P12_BASE64', 'MAC_CERTIFICATE_PASSWORD', 'MAC_SIGNING_IDENTITY', 'MAC_TEAM_ID', 'MAC_NOTARY_APPLE_ID', 'MAC_NOTARY_APP_PASSWORD']) assert.ok(readiness.includes(`secrets.${secret} != ''`));

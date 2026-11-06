@@ -76,18 +76,21 @@ test('source provenance rejects missing, moved, conflicted or modified gitlinks'
   assert.throws(() => collectSource('/fixture', (args) => args[0] === 'submodule' ? '' : git(args)), /missing/);
 });
 
-test('all 64 manual combinations on a feature branch select only the requested formats', () => {
+test('all 64 manual combinations use main-equivalent signing on every branch', () => {
+ for (const ref of ['refs/heads/main', 'refs/heads/develop', 'refs/heads/feature/example', 'refs/heads/feature/nested/example']) {
   for (let mask = 0; mask < 64; mask++) {
     const values = ['BUILD_MACOS', 'BUILD_WINDOWS', 'LINUX_FLATPAK', 'LINUX_DEB', 'LINUX_APPIMAGE', 'BUILD_DOCKER'];
-    const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/feature/example', REQUIRE_SIGNING_SECRETS: 'true' };
+    const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: ref, REQUIRE_SIGNING_SECRETS: 'true', MAC_SIGNING_READY: 'true' };
     values.forEach((key, bit) => { env['RELEASE_' + key] = String(Boolean(mask & (1 << bit))); });
     if (!mask) { assert.throws(() => resolveReleaseMode(env), /at least one/); continue; }
     const mode = resolveReleaseMode(env);
     const formats = ['flatpak', 'deb', 'appimage'].filter((_, i) => mask & (4 << i));
     assert.equal(mode.linuxPackages, formats.length === 0 || formats.length === 3 ? 'all' : formats.join(','));
     assert.equal(mode.linux, formats.length > 0);
-    assert.equal(mode.signMacos, false);
-    assert.ok(desktopMatrix(mode).include.every(row => row.environment === 'ci'));
+    assert.equal(mode.signMacos, Boolean(mask & 1));
+    assert.ok(desktopMatrix(mode).include.every(row => row.environment === (row.target === 'mac-arm64' ? 'release' : 'ci')));
+    if (mode.macos) assert.throws(() => resolveReleaseMode({ ...env, MAC_SIGNING_READY: 'false' }), /Developer ID/);
     assert.equal(mode.publish, false);
   }
+ }
 });

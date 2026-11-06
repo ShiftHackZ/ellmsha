@@ -42,10 +42,10 @@ test('release requires all three platform installers, exact hashes and source pr
     assert.equal(signed.publish, false);
     assert.equal(signed.signMacos, true);
     assert.equal((await verifyReleaseArtifacts({ directory: output, source: verification })).length, 3);
-    // Unsigned development artifacts may be staged but never published.
+    // Development manifests cannot opt out of the same macOS acceptance policy.
     const unsigned = { ...verification, signMacos: false };
     await writeFile(sourceFile, JSON.stringify(unsigned));
-    assert.equal((await stageArtifacts({ sourceFile, directory: temp, output, target: 'mac-arm64', signing: 'unsigned' })).signing, 'unsigned');
+    await assert.rejects(() => stageArtifacts({ sourceFile, directory: temp, output, target: 'mac-arm64', signing: 'unsigned' }), /signed and notarized/);
     await writeFile(path.join(output, 'BUILD-METADATA-mac-arm64.json'), JSON.stringify({ ...signed, signing: 'unsigned' }));
     await assert.rejects(() => verifyReleaseArtifacts({ directory: output, source: verification }), /Refusing unsigned macOS/);
     await assert.rejects(() => verifyReleaseArtifacts({ directory: output, source: unsigned }), /Refusing unsigned macOS/);
