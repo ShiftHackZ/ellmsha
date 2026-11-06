@@ -30,9 +30,9 @@ gh workflow run release.yml --repo ShiftHackZ/ellmsha --ref feature/my-change \
 
 To test Flatpak alone, swap the Flatpak and AppImage values. Use `gh run list --repo ShiftHackZ/ellmsha --workflow release.yml --branch feature/my-change` to find the run.
 
-## What runs on a pull request
+## What runs on a pull request or develop push
 
-Every root PR targeting `develop` or `main` runs release contracts, desktop UI tests and Rust workspace library tests against the PR merge result and its pinned submodules. Changes to the shared-terminal paths also trigger the existing cross-platform PTY suite. PR jobs use read-only repository permissions. Packaging is available separately through manual dispatch.
+Every direct push to `develop` and root PR targeting `develop` or `main` runs release contracts, desktop UI tests and Rust workspace library tests against the pushed commit or PR merge result and its pinned submodules. Changes to the shared-terminal paths also trigger the existing cross-platform PTY suite. PR jobs use read-only repository permissions. Packaging is available separately through manual dispatch.
 
 Desktop builds cache compiled Rust dependencies, package-manager downloads, Electron and electron-builder downloads, and the Flatpak installation when selected. Docker maintains its own build cache. GitHub scopes cache reuse by ref. A cache miss on a new branch is expected. Inspect the earliest failed step and retry failed jobs after resolving transient runner issues.
 
