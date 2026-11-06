@@ -5,9 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export function resolveLinuxPackages(value = 'all') {
-  if (value === 'all') return ['flatpak', 'deb'];
-  if (value === 'flatpak' || value === 'deb') return [value];
-  throw new Error(`Linux package selection must be all, flatpak or deb; got ${JSON.stringify(value)}`);
+  const formats = { flatpak: 'flatpak', deb: 'deb', appimage: 'AppImage' };
+  if (value === 'all') return Object.values(formats);
+  const selected = typeof value === 'string' ? value.split(',') : [];
+  if (!selected.length || new Set(selected).size !== selected.length ||
+      selected.some(format => !Object.hasOwn(formats, format))) {
+    throw new Error(`Linux package selection must be all or a list of flatpak, deb, appimage; got ${JSON.stringify(value)}`);
+  }
+  return selected.map(format => formats[format]);
 }
 
 function configuredRefs(config) {
