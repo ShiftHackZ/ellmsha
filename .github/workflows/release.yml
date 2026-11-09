@@ -6,22 +6,25 @@ on:
   workflow_dispatch:
     inputs:
       macos:
-        description: 'Build signed/notarized macOS arm64 installers.'
+        description: 'Build Developer ID signed and notarized macOS arm64 installers.'
         type: boolean
         default: true
       windows:
         description: 'Build the unsigned Windows x64 installer.'
         type: boolean
         default: true
-      linux:
-        description: 'Build unsigned Linux x64 desktop packages.'
+      linux-flatpak:
+        description: 'Build the Linux x64 Flatpak bundle.'
         type: boolean
         default: true
-      linux_packages:
-        description: 'Linux formats for manual verification; publication requires all.'
-        type: choice
-        options: [all, flatpak, deb]
-        default: all
+      linux-deb:
+        description: 'Build the Linux x64 Debian package.'
+        type: boolean
+        default: true
+      linux-appimage:
+        description: 'Build the Linux x64 AppImage in a container.'
+        type: boolean
+        default: true
       docker:
         description: 'Build and smoke-test all Linux VPS images.'
         type: boolean
@@ -35,13 +38,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && !inputs.publish && github.run_id || 'publication' }}
   cancel-in-progress: false
 
 jobs:
   preflight:
     runs-on: ubuntu-24.04
-    environment: ${{ (github.event_name == 'push' || inputs.macos || inputs.publish) && 'release' || 'ci' }}
+    environment: ${{ (github.event_name == 'push' || inputs.macos) && 'release' || 'ci' }}
     outputs:
       version: ${{ steps.source.outputs.version }}
       tag: ${{ steps.source.outputs.tag }}
@@ -73,8 +76,9 @@ jobs:
           RELEASE_PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
           RELEASE_BUILD_MACOS: ${{ github.event_name == 'push' || inputs.macos }}
           RELEASE_BUILD_WINDOWS: ${{ github.event_name == 'push' || inputs.windows }}
-          RELEASE_BUILD_LINUX: ${{ github.event_name == 'push' || inputs.linux }}
-          RELEASE_LINUX_PACKAGES: ${{ github.event_name == 'push' && 'all' || inputs.linux_packages }}
+          RELEASE_LINUX_FLATPAK: ${{ github.event_name == 'push' || inputs['linux-flatpak'] }}
+          RELEASE_LINUX_DEB: ${{ github.event_name == 'push' || inputs['linux-deb'] }}
+          RELEASE_LINUX_APPIMAGE: ${{ github.event_name == 'push' || inputs['linux-appimage'] }}
           RELEASE_BUILD_DOCKER: ${{ github.event_name == 'push' || inputs.docker }}
           REQUIRE_SIGNING_SECRETS: 'true'
           MAC_SIGNING_READY: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' && secrets.MAC_SIGNING_IDENTITY != '' && secrets.MAC_TEAM_ID != '' && secrets.MAC_NOTARY_APPLE_ID != '' && secrets.MAC_NOTARY_APP_PASSWORD != '' }}
@@ -168,7 +172,7 @@ jobs:
             desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-${{ hashFiles('aioncore/Cargo.lock', 'aionrs/Cargo.lock', 'aionui/bun.lock', 'aionui/scripts/memory/locks/*.json') }}-
             desktop-${{ matrix.target }}-rust1.95.0-node24.11.0-bun1.3.9-
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        if: runner.os == 'Linux' && needs.preflight.outputs.linux_packages != 'deb'
+        if: runner.os == 'Linux' && (needs.preflight.outputs.linux_packages == 'all' || contains(needs.preflight.outputs.linux_packages, 'flatpak'))
         id: flatpak-cache
         with:
           path: ${{ runner.temp }}/flatpak-user
@@ -182,16 +186,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends build-essential cmake pkg-config libssl-dev
-          if [ "$RELEASE_LINUX_PACKAGES" != deb ]; then
+          if [[ "$RELEASE_LINUX_PACKAGES" == all || "$RELEASE_LINUX_PACKAGES" == *flatpak* ]]; then
             sudo apt-get install --yes --no-install-recommends flatpak flatpak-builder dbus-x11
           fi
       - name: Install locked dependencies
         uses: ./.github/actions/install-desktop-dependencies
       - name: Prepare configured Flatpak runtimes and verify sandbox
-        if: runner.os == 'Linux' && needs.preflight.outputs.linux_packages != 'deb'
+        if: runner.os == 'Linux' && (needs.preflight.outputs.linux_packages == 'all' || contains(needs.preflight.outputs.linux_packages, 'flatpak'))
         run: dbus-run-session -- node scripts/release/flatpak-preflight.mjs --install
       - name: Prepare ephemeral Developer ID keychain and notarization
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && matrix.environment == 'release'
         env:
           MAC_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -201,7 +205,7 @@ jobs:
           MAC_NOTARY_APP_PASSWORD: ${{ secrets.MAC_NOTARY_APP_PASSWORD }}
         run: node scripts/release/ci-macos-signing.mjs setup
       - name: Build macOS installers
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && matrix.environment == 'release'
         run: |
           node scripts/release/build.mjs --signed
           node scripts/release/ci-macos-signing.mjs validate aionui/out/mac-arm64/eLLMsha.app
@@ -218,7 +222,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           test "$(node -p process.arch)" = x64
-          if [ "$RELEASE_LINUX_PACKAGES" = deb ]; then
+          if [[ "$RELEASE_LINUX_PACKAGES" != all && "$RELEASE_LINUX_PACKAGES" != *flatpak* ]]; then
             node scripts/release/build.mjs --unsigned
           else
             dbus-run-session -- node scripts/release/build.mjs --unsigned
@@ -256,7 +260,7 @@ jobs:
           path: ${{ runner.temp }}/flatpak-user
           key: ${{ steps.flatpak-cache.outputs.cache-primary-key }}
       - name: Remove temporary signing material
-        if: always() && runner.os == 'macOS'
+        if: always() && runner.os == 'macOS' && matrix.environment == 'release'
         run: node scripts/release/ci-macos-signing.mjs cleanup
 
   images:

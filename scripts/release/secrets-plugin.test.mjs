@@ -1,0 +1,20 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, statSync } from 'node:fs';
+const root = new URL('../../', import.meta.url);
+test('bundled Secrets plugin references its real scoped skill without external permissions', () => {
+  const manifest = JSON.parse(readFileSync(new URL('plugins/secrets/aion-extension.json', root)));
+  assert.equal(manifest.name, 'secrets');
+  assert.equal(manifest.permissions.shell, false);
+  assert.deepEqual(manifest.permissions.network.allowedDomains, []);
+  assert.equal(manifest.permissions.active_user, true);
+  assert.equal(manifest.contributes.skills.length, 1);
+  const skillPath = manifest.contributes.skills[0].path;
+  assert.equal(skillPath, 'skills/secrets/SKILL.md');
+  const skill = readFileSync(new URL(`plugins/secrets/${skillPath}`, root), 'utf8');
+  for (const name of ['ellmsha_global_secrets_list', 'ellmsha_project_secrets_list', 'ellmsha_ask_user']) assert.ok(skill.includes(name));
+  assert.match(skill, /Standard project/);
+  assert.match(skill, /Never save codes, TOTP seeds, recovery material or passkey private keys/);
+  assert.match(skill, /Masking does not erase/);
+  assert.ok(statSync(new URL('plugins/secrets/README.md', root)).isFile());
+});

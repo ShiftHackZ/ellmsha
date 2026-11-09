@@ -14,7 +14,7 @@ test('release requires all three platform installers, exact hashes and source pr
   const output = path.join(temp, 'staged');
   try {
     await writeFile(sourceFile, JSON.stringify(source));
-    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': ['flatpak', 'deb'] })) {
+    for (const [target, extensions] of Object.entries({ 'mac-arm64': ['dmg', 'zip'], 'win-x64': ['exe'], 'linux-x64': ['flatpak', 'deb', 'AppImage'] })) {
       const entries = [];
       for (const extension of extensions) {
         const name = `eLLMsha-${source.version}-${target}.${extension}`;
@@ -42,7 +42,7 @@ test('release requires all three platform installers, exact hashes and source pr
     assert.equal(signed.publish, false);
     assert.equal(signed.signMacos, true);
     assert.equal((await verifyReleaseArtifacts({ directory: output, source: verification })).length, 3);
-    // Old/malformed provenance cannot opt out of the fixed macOS signing contract.
+    // Development manifests cannot opt out of the same macOS acceptance policy.
     const unsigned = { ...verification, signMacos: false };
     await writeFile(sourceFile, JSON.stringify(unsigned));
     await assert.rejects(() => stageArtifacts({ sourceFile, directory: temp, output, target: 'mac-arm64', signing: 'unsigned' }), /signed and notarized/);
@@ -59,14 +59,14 @@ test('release requires all three platform installers, exact hashes and source pr
 });
 
 
-for (const [platform, target, extensions] of [['darwin', 'mac-arm64', ['dmg', 'zip']], ['win32', 'win-x64', ['exe']], ['linux', 'linux-x64', ['flatpak', 'deb']]]) {
+for (const [platform, target, extensions] of [['darwin', 'mac-arm64', ['dmg', 'zip']], ['win32', 'win-x64', ['exe']], ['linux', 'linux-x64', ['flatpak', 'deb', 'AppImage']]]) {
   test(`zero-padded release dates preserve ${target} installer bytes and public names`, async () => {
     const temp = await mkdtemp(path.join(os.tmpdir(), 'ellmsha-date-artifacts-'));
     const version = '2026.01.02-patch.3';
     const data = Buffer.from('synthetic signed installer bytes');
     try {
       for (const extension of extensions) {
-        const nativeTarget = platform === 'linux' ? `linux-${extension === 'flatpak' ? 'x86_64' : 'amd64'}` : target;
+        const nativeTarget = platform === 'linux' ? `linux-${{ flatpak: 'x86_64', deb: 'amd64', AppImage: 'x64' }[extension]}` : target;
         await writeFile(path.join(temp, `eLLMsha-2026.1.2-patch.3-${nativeTarget}.${extension}`), data);
       }
       await verifyArtifacts({ directory: temp, version, platform, arch: target.endsWith('arm64') ? 'arm64' : 'x64' });
@@ -94,15 +94,17 @@ test('date normalization never accepts a different patch or overwrites an existi
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
 
-for (const linuxPackages of ['flatpak', 'deb']) {
+for (const linuxPackages of ['flatpak', 'deb', 'appimage']) {
   test(`Linux ${linuxPackages}-only verification stages exact selected bytes without requiring other formats`, async () => {
     const temp = await mkdtemp(path.join(os.tmpdir(), 'ellmsha-linux-artifact-'));
     const source = { version: '2026.11.04-patch.1', publish: false, linuxPackages, source: { commit: 'a'.repeat(40), submodules: [] } };
     const sourceFile = path.join(temp, 'source.json');
     const output = path.join(temp, 'staged');
     const data = Buffer.from(`synthetic ${linuxPackages} bytes`);
-    const nativeName = `eLLMsha-2026.11.4-patch.1-linux-${linuxPackages === 'flatpak' ? 'x86_64' : 'amd64'}.${linuxPackages}`;
-    const publicName = `eLLMsha-${source.version}-linux-x64.${linuxPackages}`;
+    const extension = linuxPackages === 'appimage' ? 'AppImage' : linuxPackages;
+    const publicName = `eLLMsha-${source.version}-linux-x64.${extension}`;
+    const nativeName = linuxPackages === 'appimage' ? publicName :
+      `eLLMsha-2026.11.4-patch.1-linux-${linuxPackages === 'flatpak' ? 'x86_64' : 'amd64'}.${extension}`;
     try {
       await writeFile(sourceFile, JSON.stringify(source));
       await writeFile(path.join(temp, nativeName), data);
